@@ -116,7 +116,7 @@ def build_tm_model(opt, dicts):
                                                 bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
                                                 bert_hidden_size=opt.enc_pretrain_hidden_size
                                            )
-            elif opt.src_pretrained_model == "roberat":
+            elif opt.src_pretrained_model == "roberta":
                 from pretrain_module.configuration_roberta import RobertaConfig
                 from pretrain_module.modeling_roberta import RobertaModel
 
@@ -131,7 +131,7 @@ def build_tm_model(opt, dicts):
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)
-            opt.src_not_load_state=True
+
             if opt.src_not_load_state:
                 print("We do not load the state from pytorch")
             else:

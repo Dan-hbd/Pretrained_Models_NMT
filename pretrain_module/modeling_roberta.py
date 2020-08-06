@@ -50,6 +50,7 @@ class RobertaEmbeddings(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.padding_idx = config.pad_token_id
+        print("the padding_idx is:",self.padding_idx)
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=self.padding_idx)
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings, config.hidden_size, padding_idx=self.padding_idx
@@ -86,7 +87,6 @@ class RobertaEmbeddings(nn.Module):
         if inputs_embeds is None:
             embed = self.word_embeddings
             if self.bert_word_dropout and self.training:
-                print("yes: training and bert_word_dropout is:", self.bert_word_dropout)
                 mask = embed.weight.data.new().resize_((embed.weight.size(0), 1)).bernoulli_(
                     1 - self.bert_word_dropout). \
                            expand_as(embed.weight) / (1 - self.bert_word_dropout)
