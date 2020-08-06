@@ -59,30 +59,8 @@ class RobertaEmbeddings(nn.Module):
         self.bert_word_dropout = config.bert_word_dropout
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
-        # if position_ids is None:
-        #     if input_ids is not None:
-        #         # Create the position ids from the input token ids. Any padded tokens remain padded.
-        #         position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
-        #     else:
-        #         position_ids = self.create_position_ids_from_inputs_embeds(inputs_embeds)
-        #
-        # return super().forward(
-        #     input_ids, token_type_ids=token_type_ids, position_ids=position_ids, inputs_embeds=inputs_embeds
-        # )
-        if input_ids is not None:
-            input_shape = input_ids.size()
-        else:
-            input_shape = inputs_embeds.size()[:-1]
-
-        seq_length = input_shape[1]
-        position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device)
-        #if seq_length > self.max_position_id-1:
-        if seq_length > self.max_position_id:
-            position_ids = torch.clamp(position_ids, 0, self.max_position_id-1)
-        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
-
-        if position_ids is None:
-            position_ids = self.position_ids[:, :seq_length]
+        position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
+        position_embeddings = self.position_embeddings(position_ids)
 
         if inputs_embeds is None:
             embed = self.word_embeddings
@@ -94,13 +72,11 @@ class RobertaEmbeddings(nn.Module):
                 masked_embed_weight = mask * embed.weight
             else:
                 masked_embed_weight = embed.weight
-            padding_idx = embed.padding_idx
-            words_embeddings = F.embedding(
-                input_ids, masked_embed_weight, padding_idx, embed.max_norm,
-                embed.norm_type, embed.scale_grad_by_freq, embed.sparse)
 
-
-        position_embeddings = self.position_embeddings(position_ids)
+        padding_idx = embed.padding_idx
+        words_embeddings = F.embedding(
+            input_ids, masked_embed_weight, padding_idx, embed.max_norm,
+            embed.norm_type, embed.scale_grad_by_freq, embed.sparse)
 
         embeddings = words_embeddings + position_embeddings
         return embeddings
@@ -188,13 +164,15 @@ class RobertaModel(BertModel):
                  bert_emb_dropout=None,
                  bert_atten_dropout=None,
                  bert_hidden_dropout=None,
-                 bert_hidden_size=None):
+                 bert_hidden_size=None,
+                 is_decoder=False):
 
         super().__init__(config,bert_word_dropout,
                          bert_emb_dropout,
                          bert_atten_dropout,
                          bert_hidden_dropout,
-                         bert_hidden_size)
+                         bert_hidden_size,
+                         is_decoder)
 
         # 替换掉原来bert的embedding 为roberta 的 embedding
         roberta_embeddings = RobertaEmbeddings(config)

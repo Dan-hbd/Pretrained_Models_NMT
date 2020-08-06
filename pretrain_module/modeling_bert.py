@@ -801,7 +801,8 @@ class BertModel(BertPreTrainedModel):
                  bert_emb_dropout=None,
                  bert_atten_dropout=None,
                  bert_hidden_dropout=None,
-                 bert_hidden_size=None):
+                 bert_hidden_size=None,
+                 is_decoder=False):
 
         super().__init__(config)
         self.config = config
@@ -815,6 +816,8 @@ class BertModel(BertPreTrainedModel):
             self.config.bert_hidden_dropout=bert_hidden_dropout
         if bert_hidden_size is not None:
             self.config.bert_hidden_size=bert_hidden_size
+        if is_decoder is not None:
+            self.config.is_decoder=is_decoder
 
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)

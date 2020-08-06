@@ -131,7 +131,9 @@ def build_tm_model(opt, dicts):
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)
-            
+
+            encoder.enc_pretrained_model = opt.enc_pretrained_model
+
             print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
             if opt.enc_not_load_state:
                 print("We do not load the state from pytorch")
@@ -152,7 +154,7 @@ def build_tm_model(opt, dicts):
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
 
-        if opt.dec_pretrained_model == "":
+        if opt.dec_pretrained_model == "transformer":
             print("Pretrained model is not applied to decoder")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
 
@@ -167,22 +169,24 @@ def build_tm_model(opt, dicts):
                                 bert_emb_dropout=opt.dec_pretrain_emb_dropout,
                                 bert_atten_dropout=opt.dec_pretrain_attn_dropout,
                                 bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
-                                bert_hidden_size=opt.dec_pretrain_hidden_size
+                                bert_hidden_size=opt.dec_pretrain_hidden_size,
+                                is_decoder=True,
                                 )
 
-        elif opt.dec_pretrained_model == "roberat":
-            print("Pretrained model {} is appled to decoder".format(opt.dec_pretrained_model))
-            if opt.enc_pretrained_model != "roberat":
+        elif opt.dec_pretrained_model == "roberta":
+            print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
+            if opt.enc_pretrained_model != "roberta":
                 from pretrain_module.configuration_roberta import RobertaConfig
                 from pretrain_module.modeling_roberta import RobertaModel
 
             dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
             decoder = RobertaModel(dec_roberta_config,
-                                            bert_word_dropout=opt.dec_pretrain_word_dropout,
-                                            bert_emb_dropout=opt.dec_pretrain_emb_dropout,
-                                            bert_atten_dropout=opt.dec_pretrain_attn_dropout,
-                                            bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
-                                            bert_hidden_size=opt.dec_pretrain_hidden_size
+                                    bert_word_dropout=opt.dec_pretrain_word_dropout,
+                                    bert_emb_dropout=opt.dec_pretrain_emb_dropout,
+                                    bert_atten_dropout=opt.dec_pretrain_attn_dropout,
+                                    bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
+                                    bert_hidden_size=opt.dec_pretrain_hidden_size,
+                                    is_decoder=True,
                                  )
             if opt.dec_not_load_state:
                 print("We don't load the state for pretrained model of decoder from pytorch")
@@ -201,6 +205,10 @@ def build_tm_model(opt, dicts):
                                         )
 
 
+        else:
+            print("Unknown decoder pretrained model :", opt.dec_pretrained_model)
+            exit(-1)
+        decoder.dec_pretrained_model = opt.dec_pretrained_model
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
 
     else:
@@ -214,13 +222,16 @@ def build_tm_model(opt, dicts):
         init.xavier_uniform_(g.linear.weight)
 
     if opt.init_embedding == 'xavier':
-        if model.encoder.word_lut:
+        if model.encoder.enc_pretrained_model is None:
             init.xavier_uniform_(model.encoder.word_lut.weight)
-        init.xavier_uniform_(model.decoder.word_lut.weight)
+        if model.decoder.dec_pretrained_model is None:
+            init.xavier_uniform_(model.decoder.word_lut.weight)
+
     elif opt.init_embedding == 'normal':
-        # if model.encoder.word_lut:
-        #     init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
-        init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
+        if model.encoder.enc_pretrained_model is None:
+            init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
+        if model.decoder.dec_pretrained_model is None:
+            init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
 
     return model
 

@@ -43,9 +43,9 @@ def make_parser(parser):
                         help="""Merge action for the bidirectional hidden states:
                         [concat|sum]""")
 
-    parser.add_argument('-enc_pretrained_model', default="", type=str,
+    parser.add_argument('-enc_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")
-    parser.add_argument('-dec_pretrained_model', default="", type=str,
+    parser.add_argument('-dec_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")
 
     # options of pretrained model for encoder

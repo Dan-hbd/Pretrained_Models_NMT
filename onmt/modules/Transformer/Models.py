@@ -438,9 +438,16 @@ class Transformer(NMTModel):
     def __init__(self, encoder, decoder, generator=None):
         super().__init__(encoder, decoder, generator)
         self.encoder = self.encoder
-        self.model_size = self.decoder.model_size
-        self.switchout = self.decoder.switchout
-        self.tgt_vocab_size = self.decoder.word_lut.weight.size(0)
+        if decoder.dec_pretrained_model == "transformer":  # no pretrained model for decoder
+            self.model_size = self.decoder.model_size
+            self.switchout = self.decoder.switchout
+            self.tgt_vocab_size = self.decoder.word_lut.weight.size(0)
+        elif decoder.dec_pretrained_model == "roberta" or decoder.dec_pretrained_model == "bert": 
+            self.model_size = self.decoder.config.bert_hidden_size
+            self.tgt_vocab_size = self.decoder.config.vocab_size
+        else:
+            print("Warning: dec_pretrained_model is not correct")
+            exit(-1)
 
 
     def reset_states(self):
@@ -463,11 +470,12 @@ class Transformer(NMTModel):
         tgt_atb = batch.get('target_atb')  # a dictionary of attributes
 
         src = src.transpose(0, 1)   # transpose to have batch first [b, src_len]
+
         tgt = tgt.transpose(0, 1)   # [b, tgt_len]
-        input_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
+        src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
 
         segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()
-        encoder_outputs = self.encoder(src, segments_tensor, input_mask)
+        encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask)
 
         # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
         context = encoder_outputs[0]
@@ -476,17 +484,34 @@ class Transformer(NMTModel):
         if zero_encoder:
             context.zero_()
 
-        # 在 decoder部分，我们用到了src 做mask_src 我不想改变这部分
-        # src: [b, l]
-        # context: [b, l, de_model]  =>  [l, b, de_model]
-        context = context.transpose(0, 1)
-        decoder_output = self.decoder(tgt, context, src, atbs=tgt_atb)
-        output = decoder_output['hidden']
+        if self.decoder.dec_pretrained_model == "transformer":
+            # 在 decoder部分，我们用到了src 做mask_src 我不想改变这部分
+            # src: [b, l]
+            # context: [b, l, de_model]  =>  [l, b, de_model]
+            context = context.transpose(0, 1)
+            decoder_output = self.decoder(tgt, context, src, atbs=tgt_atb)
+            output = decoder_output['hidden']
+
+        elif self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model =="roberta":
+            # src: [b, l], src 用于做mask_src
+            # context: [b, l, de_model]
+            # tgt: 训练过程是tgt_input
+            tgt_token_type = tgt.ne(onmt.Constants.TGT_PAD).long()  # [bsz, len]
+            tgt_attention_mask = tgt.ne(onmt.Constants.TGT_PAD).long()  # [bsz, len]
+            decoder_output = self.decoder(input_ids=tgt,
+                                          attention_mask=tgt_attention_mask,
+                                          token_type_ids=tgt_token_type,
+                                          encoder_hidden_states=context,
+                                          encoder_attention_mask=src_attention_mask)
+            decoder_output = decoder_output.transpose(0,1)
+            output = decoder_output
+
+
 
         output_dict = defaultdict(lambda: None)
         output_dict['hidden'] = output
         output_dict['encoder'] = context
-        output_dict['src_mask'] = input_mask
+        output_dict['src_mask'] = src_attention_mask
 
 
         # This step removes the padding to reduce the load for the final layer
