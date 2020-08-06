@@ -51,7 +51,6 @@ def main():
 
     existed_save_files = checkpoint_paths(path)
 
-    # print(existed_save_files)
     models = existed_save_files
     # # opt.model should be a string of models, split by |
     # models = list()
@@ -61,7 +60,6 @@ def main():
 
     # print(models)
     n_models = len(models)
-    print("Firstly load the best model from %s ..." % models[0])
     checkpoint = torch.load(models[0], map_location=lambda storage, loc: storage)
 
     if 'optim' in checkpoint:
@@ -73,22 +71,23 @@ def main():
 
     model_opt = checkpoint['opt']
     # 下面load_state_dict有依次加载最优的五个模型，所以这里只用构建对象 
-    model_opt.src_not_load_state = True
-    model_opt.tgt_not_load_state = True
+    model_opt.enc_not_load_state = True
+    model_opt.dec_not_load_state = True
     dicts = checkpoint['dicts']
 
     main_model = custom_build_model(model_opt, checkpoint['dicts'], lm=opt.lm)
 
+    print("Firstly load the best model from %s ..." % models[0])
     main_model.load_state_dict(checkpoint['model'])
 
     if opt.cuda:
         main_model = main_model.cuda()
     print("Then load the other %d models ..." % (n_models-1))
     for i in range(1, len(models)):
-
+        
         model = models[i]
+        print("Model %d from the rest models" % i)
         print("Loading model from %s ..." % models[i])
-        print("\n")
         checkpoint = torch.load(model, map_location=lambda storage, loc: storage)
 
         model_opt = checkpoint['opt']

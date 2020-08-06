@@ -43,29 +43,29 @@ def make_parser(parser):
                         help="""Merge action for the bidirectional hidden states:
                         [concat|sum]""")
 
-    parser.add_argument('-src_pretrained_model', default="", type=str,
+    parser.add_argument('-enc_pretrained_model', default="", type=str,
                         help=""" the name of trained model""")
-    parser.add_argument('-tgt_pretrained_model', default="", type=str,
+    parser.add_argument('-dec_pretrained_model', default="", type=str,
                         help=""" the name of trained model""")
 
     # options of pretrained model for encoder
-    parser.add_argument('-src_pretrained_config_dir', default="", type=str,
+    parser.add_argument('-enc_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model for src language.""")
-    parser.add_argument('-src_config_name', default="bert_config.json", type=str,
+    parser.add_argument('-enc_config_name', default="bert_config.json", type=str,
                         help=""" the name of src pretrained model configuration.""")
-    parser.add_argument('-src_state_dict', default="", type=str,
+    parser.add_argument('-enc_state_dict', default="", type=str,
                         help=""" the state_dict of the  pretrained model for src language """)
-    parser.add_argument('-src_not_load_state', action='store_true',
+    parser.add_argument('-enc_not_load_state', action='store_true',
                         help='only create a  Bert Object, not load the state from pytorch modle or fituned model for src')
 
-    parser.add_argument('-tgt_pretrained_config_dir', default="", type=str,
+    parser.add_argument('-dec_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model.""")
-    parser.add_argument('-tgt_state_dict', default="", type=str,
+    parser.add_argument('-dec_state_dict', default="", type=str,
                         help=""" the state_dict of the  pretrained model""")
-    parser.add_argument('-tgt_not_load_state', action='store_true',
+    parser.add_argument('-dec_not_load_state', action='store_true',
                         help='only create a  Bert Object, not load the state from pytorch modle or fituned model for tgt')
 
-    parser.add_argument('-tgt_config_name', default="bert_config.json", type=str,
+    parser.add_argument('-dec_config_name', default="bert_config.json", type=str,
                         help=""" the name of tgt pretrained model configuration.""")
     # parser.add_argument('-pretrain_weight_name', default="pytorch_model.bin", type=str,
     #                     help=""" the name of bin file of the pretrained model.""")

@@ -40,9 +40,8 @@ class Translator(object):
         self._type = 'text'
 
         for i, model in enumerate(models):
-            if opt.verbose:
-                print('Loading model from %s' % model)
-            checkpoint = torch.load(model,
+            model_path=model
+            checkpoint = torch.load(model_path,
                                     map_location=lambda storage, loc: storage)
 
             model_opt = checkpoint['opt']
@@ -62,17 +61,12 @@ class Translator(object):
 
                 self.bos_id = self.tgt_dict.labelToIdx[self.bos_token]
 
-
-
-            # Build model from the saved option
-            # if hasattr(model_opt, 'fusion') and model_opt.fusion == True:
-            #     print("* Loading a FUSION model")
-            #     model = build_fusion(model_opt, checkpoint['dicts'])
-            # else:
-            #     model = build_model(model_opt, checkpoint['dicts'])
+            model_opt.enc_not_load_state = True
+            model_opt.dec_not_load_state = True
             model = build_model(model_opt, checkpoint['dicts'])
             
             # by me
+            print('Loading model from %s' % model_path)
             model.load_state_dict(checkpoint['model'])
 
             if model_opt.model in model_list:

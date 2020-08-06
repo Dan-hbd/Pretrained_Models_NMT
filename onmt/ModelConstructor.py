@@ -49,12 +49,12 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'variational_dropout'):
         opt.variational_dropout = False
 
-    if opt.src_pretrained_model == 'bert':
+    if opt.enc_pretrained_model == 'bert':
         onmt.Constants.SRC_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.BERT_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.BERT_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.BERT_EOS
-    if opt.src_pretrained_model == 'roberta':
+    if opt.enc_pretrained_model == 'roberta':
         onmt.Constants.SRC_PAD = onmt.Constants.EN_ROBERTA_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.EN_ROBERTA_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.EN_ROBERTA_BOS
@@ -103,12 +103,12 @@ def build_tm_model(opt, dicts):
         onmt.Constants.init_value = opt.param_init
 
         if opt.encoder_type == "text":
-            print("Build a pretrained model: {}, for encoder".format(opt.src_pretrained_model))
-            if opt.src_pretrained_model == "bert":
+            print("Build a pretrained model: {}, for encoder".format(opt.enc_pretrained_model))
+            if opt.enc_pretrained_model == "bert":
                 from pretrain_module.configuration_bert import BertConfig
                 from pretrain_module.modeling_bert import BertModel
 
-                enc_bert_config = BertConfig.from_json_file(opt.src_pretrained_config_dir + "/" + opt.src_config_name)
+                enc_bert_config = BertConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
                 encoder = BertModel(enc_bert_config,
                                                 bert_word_dropout=opt.enc_pretrain_word_dropout,
                                                 bert_emb_dropout=opt.enc_pretrain_emb_dropout,
@@ -116,11 +116,11 @@ def build_tm_model(opt, dicts):
                                                 bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
                                                 bert_hidden_size=opt.enc_pretrain_hidden_size
                                            )
-            elif opt.src_pretrained_model == "roberta":
+            elif opt.enc_pretrained_model == "roberta":
                 from pretrain_module.configuration_roberta import RobertaConfig
                 from pretrain_module.modeling_roberta import RobertaModel
 
-                enc_roberta_config = RobertaConfig.from_json_file(opt.src_pretrained_config_dir + "/" + opt.src_config_name)
+                enc_roberta_config = RobertaConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
                 encoder = RobertaModel(enc_roberta_config,
                                                 bert_word_dropout=opt.enc_pretrain_word_dropout,
                                                 bert_emb_dropout=opt.enc_pretrain_emb_dropout,
@@ -131,36 +131,37 @@ def build_tm_model(opt, dicts):
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)
-
-            if opt.src_not_load_state:
+            
+            print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
+            if opt.enc_not_load_state:
                 print("We do not load the state from pytorch")
             else:
-                src_state_dict_file=opt.src_pretrained_config_dir + "/" + opt.src_state_dict
-                print("After builing pretrained model we load the state from:\n",src_state_dict_file)
+                enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
+                print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
 
-                src_model_state_dict = torch.load(src_state_dict_file, map_location="cpu")
+                enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
 
-                encoder.from_pretrained(pretrained_model_name_or_path=opt.src_pretrained_config_dir,
+                encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
                                         model=encoder,
                                         output_loading_info=True,
-                                        state_dict=src_model_state_dict,
-                                        model_prefix=opt.src_pretrained_model
+                                        state_dict=enc_model_state_dict,
+                                        model_prefix=opt.enc_pretrained_model
                                         )
 
         else:
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
 
-        if opt.tgt_pretrained_model == "":
+        if opt.dec_pretrained_model == "":
             print("Pretrained model is not applied to decoder")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
 
-        elif opt.tgt_pretrained_model == "bert":
-            print("Pretrained model {} is appled to decoder".format(opt.tgt_pretrained_model))
-            if opt.src_pretrained_model != "bert":
+        elif opt.dec_pretrained_model == "bert":
+            print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
+            if opt.enc_pretrained_model != "bert":
                 from pretrain_module.configuration_roberta import RobertaConfig
                 from pretrain_module.modeling_roberta import RobertaModel
-            dec_bert_config = BertConfig.from_json_file(opt.tgt_pretrained_config_dir + "/" + opt.tgt_config_name)
+            dec_bert_config = BertConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
             decoder = BertModel(dec_bert_config,
                                 bert_word_dropout=opt.dec_pretrain_word_dropout,
                                 bert_emb_dropout=opt.dec_pretrain_emb_dropout,
@@ -169,13 +170,13 @@ def build_tm_model(opt, dicts):
                                 bert_hidden_size=opt.dec_pretrain_hidden_size
                                 )
 
-        elif opt.src_pretrained_model == "roberat":
-            print("Pretrained model {} is appled to decoder".format(opt.tgt_pretrained_model))
-            if opt.src_pretrained_model != "roberat":
+        elif opt.dec_pretrained_model == "roberat":
+            print("Pretrained model {} is appled to decoder".format(opt.dec_pretrained_model))
+            if opt.enc_pretrained_model != "roberat":
                 from pretrain_module.configuration_roberta import RobertaConfig
                 from pretrain_module.modeling_roberta import RobertaModel
 
-            dec_roberta_config = RobertaConfig.from_json_file(opt.tgt_pretrained_config_dir + "/" + opt.gt_config_name)
+            dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
             decoder = RobertaModel(dec_roberta_config,
                                             bert_word_dropout=opt.dec_pretrain_word_dropout,
                                             bert_emb_dropout=opt.dec_pretrain_emb_dropout,
@@ -183,20 +184,20 @@ def build_tm_model(opt, dicts):
                                             bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
                                             bert_hidden_size=opt.dec_pretrain_hidden_size
                                  )
-            if opt.tgt_not_load_state:
+            if opt.dec_not_load_state:
                 print("We don't load the state for pretrained model of decoder from pytorch")
 
             else:
-                tgt_state_dict_file=opt.tgt_pretrained_config_dir + "/" + opt.tgt_state_dict
-                print("After builing pretrained model we load the state from:\n",src_state_dict_file)
+                dec_state_dict_file=opt.dec_pretrained_config_dir + "/" + opt.dec_state_dict
+                print("After builing pretrained model we load the state from:\n",dec_state_dict_file)
 
-                tgt_model_state_dict = torch.load(tgt_state_dict_file, map_location="cpu")
+                dec_model_state_dict = torch.load(dec_state_dict_file, map_location="cpu")
 
-                decoder.from_pretrained(pretrained_model_name_or_path=opt.src_pretrained_config_dir,
+                decoder.from_pretrained(pretrained_model_name_or_path=opt.dec_pretrained_config_dir,
                                         model=decoder,
                                         output_loading_info=True,
-                                        state_dict=tgt_model_state_dict,
-                                        model_prefix=opt.src_pretrained_model
+                                        state_dict=dec_model_state_dict,
+                                        model_prefix=opt.dec_pretrained_model
                                         )
 
 
