@@ -91,7 +91,8 @@ def main():
         checkpoint = torch.load(model, map_location=lambda storage, loc: storage)
 
         model_opt = checkpoint['opt']
-        model_opt.not_load_bert_state = True     
+        model_opt.enc_not_load_state = True     
+        model_opt.dec_not_load_state = True     
         # delete optim information to save GPU memory
         if 'optim' in checkpoint:
             del checkpoint['optim']
