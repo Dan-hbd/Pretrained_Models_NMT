@@ -165,18 +165,22 @@ class RobertaModel(BertModel):
                  bert_atten_dropout=None,
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
-                 is_decoder=False):
+                 is_decoder=False,
+                 encoder_normalize_before=False):
 
         super().__init__(config,bert_word_dropout,
                          bert_emb_dropout,
                          bert_atten_dropout,
                          bert_hidden_dropout,
                          bert_hidden_size,
-                         is_decoder)
+                         is_decoder,
+                         encoder_normalize_before
+                         )
 
         # 替换掉原来bert的embedding 为roberta 的 embedding
         roberta_embeddings = RobertaEmbeddings(config)
         self.add_module('embeddings', roberta_embeddings)
+
         self.init_weights()
 
     def get_input_embeddings(self):
