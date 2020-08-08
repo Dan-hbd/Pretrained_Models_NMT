@@ -827,7 +827,7 @@ class BertModel(BertPreTrainedModel):
         self.encoder = BertEncoder(config)
 
         if encoder_normalize_before:
-            emb_layer_norm = BertLayerNorm(self.config.hidden_size, eps=config.layer_norm_eps)
+            self.emb_layer_norm = BertLayerNorm(self.config.hidden_size, eps=config.layer_norm_eps)
         # self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -925,7 +925,7 @@ class BertModel(BertPreTrainedModel):
             return_dict=return_dict,
         )
         if self.config.encoder_normalize_before:
-            sequence_output = BertLayerNorm(encoder_outputs[0])
+            sequence_output = self.emb_layer_norm(encoder_outputs[0])
         else:
             sequence_output = encoder_outputs[0]
             
