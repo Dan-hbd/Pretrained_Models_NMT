@@ -11,7 +11,6 @@ from onmt.ModelConstructor import build_model
 from options import make_parser
 from collections import defaultdict
 
-
 print("cuda is available: ", torch.cuda.is_available())
 
 parser = argparse.ArgumentParser(description='train.py')
@@ -193,6 +192,37 @@ def main():
     print('Building model...')
 
     model = build_model(opt, dicts)
+
+    if opt.get_context_emb is not None:
+        assert opt.enc_pretrained_model == "transformer"
+        assert opt.dec_pretrained_model == "transformer"
+        print("We use pretrained model to get contextualized embeddings and feed them to the original transformer")
+
+        if opt.get_context_emb == "bert":
+            from pretrain_module.configuration_bert import BertConfig
+            from pretrain_module.modeling_bert import BertModel
+            emb_pretrain_config = BertConfig.from_json_file(opt.emb_pretrained_config_dir + "/" + opt.emb_config_name)
+            pretrain_emb = BertModel(emb_pretrain_config,
+                                bert_word_dropout=opt.emb_pretrain_word_dropout,
+                                bert_emb_dropout=opt.emb_pretrain_emb_dropout,
+                                bert_atten_dropout=opt.emb_pretrain_attn_dropout,
+                                bert_hidden_dropout=opt.emb_pretrain_hidden_dropout,
+                                bert_hidden_size=opt.emb_pretrain_hidden_size,
+                                is_decoder=False,
+                                )
+            emb_state_dict_file = opt.emb_pretrained_config_dir + "/" + opt.emb_pretrained_state_dict
+            emb_model_state_dict = torch.load(emb_state_dict_file, map_location="cpu")
+            print("After builing pretrained model we load the state from:\n", emb_state_dict_file)
+            pretrain_emb.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
+                                    model=pretrain_emb,
+                                    output_loading_info=True,
+                                    state_dict=emb_model_state_dict,
+                                    model_prefix=opt.get_context_emb
+                                    )
+            model.add_module("pretrain_emb", pretrain_emb)
+        else:
+            print("Warning: contextualized embeddings can be only got from bert or roberta")
+            exit(-1)
 
     """ Building the loss function """
     loss_function = NMTLossFunc(dicts['tgt'].size(),

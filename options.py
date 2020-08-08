@@ -43,12 +43,40 @@ def make_parser(parser):
                         help="""Merge action for the bidirectional hidden states:
                         [concat|sum]""")
 
+    # options of embedding module
+    parser.add_argument('-get_context_emb', default="", type=str,
+                        help='get contextualized embeddings for tokens before feed them to the transformer')
+
+
+    parser.add_argument('-emb_pretrained_config_dir', default="", type=str,
+                        help=""" the path to the pretrained model for contextualized embeddings.""")
+    parser.add_argument('-emb_config_name', default="bert_config.json", type=str,
+                        help=""" the name of pretrained model configuration for embedding module""")
+    parser.add_argument('-emb_pretrained_state_dict', default="", type=str,
+                        help=""" the state_dict of the  pretrained model for embedding module """)
+    parser.add_argument('-emb_not_load_state', action='store_true',
+                        help='only create a Object, not load the state from pytorch modle or fituned model')
+
+
+    parser.add_argument('-emb_pretrain_word_dropout', type=float, default=0.0,
+                        help="""word dropout applied on embedding module""")
+    parser.add_argument('-emb_pretrain_emb_dropout', type=float, default=0.1,
+                        help="""dropout applied on embedding module""")
+    parser.add_argument('-emb_pretrain_attn_dropout', type=float, default=0.1,
+                        help="""dropout on embedding module attention, corresponds to attention_probs_dropout_prob""")
+    parser.add_argument('-emb_pretrain_hidden_dropout', type=float, default=0.1,
+                        help="""dropout applied on embedding module hidden, corresponds to hidden_dropout_prob""")
+    parser.add_argument('-emb_pretrain_hidden_size', type=int, default=768,
+        help='Size of the hidden of the embedding module')
+
+
+
+    # options of pretrained model for encoder and dec
     parser.add_argument('-enc_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")
     parser.add_argument('-dec_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")
 
-    # options of pretrained model for encoder
     parser.add_argument('-enc_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model for src language.""")
     parser.add_argument('-enc_config_name', default="bert_config.json", type=str,
@@ -100,7 +128,7 @@ def make_parser(parser):
 
 
 
-    # Transforer Model options
+    # Transformer Model options
     parser.add_argument('-model_size', type=int, default=512,
         help='Size of embedding / transformer hidden')      
     parser.add_argument('-inner_size', type=int, default=2048,

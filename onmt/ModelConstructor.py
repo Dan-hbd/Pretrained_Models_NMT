@@ -89,7 +89,14 @@ def build_tm_model(opt, dicts):
     # BUILD GENERATOR
     generators = [onmt.modules.BaseModel.Generator(opt.model_size, dicts['tgt'].size())]
 
-    embedding_src = None
+    if 'src' in dicts and opt.get_context_emb is None and opt.enc_pretrained_model == "transformer":
+        assert opt.enc_pretrained_model=="transformer"
+        assert opt.dec_pretrained_model=="transformer"
+        embedding_src = nn.Embedding(dicts['src'].size(),
+        opt.model_size,
+        padding_idx = onmt.Constants.SRC_PAD)
+    else:
+        embedding_src = None
 
     if opt.join_embedding and embedding_src is not None:
         embedding_tgt = embedding_src
@@ -103,63 +110,67 @@ def build_tm_model(opt, dicts):
         onmt.Constants.init_value = opt.param_init
 
         if opt.encoder_type == "text":
-            print("Build a pretrained model: {}, for encoder".format(opt.enc_pretrained_model))
-            if opt.enc_pretrained_model == "bert":
-                from pretrain_module.configuration_bert import BertConfig
-                from pretrain_module.modeling_bert import BertModel
-
-                enc_bert_config = BertConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
-                encoder = BertModel(enc_bert_config,
-                                                bert_word_dropout=opt.enc_pretrain_word_dropout,
-                                                bert_emb_dropout=opt.enc_pretrain_emb_dropout,
-                                                bert_atten_dropout=opt.enc_pretrain_attn_dropout,
-                                                bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
-                                                bert_hidden_size=opt.enc_pretrain_hidden_size,
-                                                is_decoder=False,
-                                           )
-            elif opt.enc_pretrained_model == "roberta":
-                from pretrain_module.configuration_roberta import RobertaConfig
-                from pretrain_module.modeling_roberta import RobertaModel
-
-                enc_roberta_config = RobertaConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
-                encoder = RobertaModel(enc_roberta_config,
-                                       bert_word_dropout=opt.enc_pretrain_word_dropout,
-                                       bert_emb_dropout=opt.enc_pretrain_emb_dropout,
-                                       bert_atten_dropout=opt.enc_pretrain_attn_dropout,
-                                       bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
-                                       bert_hidden_size=opt.enc_pretrain_hidden_size,
-                                       is_decoder=False,
-                                       encoder_normalize_before=opt.enc_ln_before,
-                                     )
-                print(opt.enc_ln_before,"enc_ln_before")
+            if opt.enc_pretrained_model == "transformer":
+                print("Encoder is not initialized from pretrained model")
+                encoder = TransformerEncoder(opt, embedding_src, positional_encoder, opt.encoder_type)
             else:
-                print("Warning: now only bert and roberta pretrained models are implemented:")
-                exit(-1)
+                print("Build a pretrained model: {}, for encoder".format(opt.enc_pretrained_model))
+                if opt.enc_pretrained_model == "bert":
+                    from pretrain_module.configuration_bert import BertConfig
+                    from pretrain_module.modeling_bert import BertModel
+
+                    enc_bert_config = BertConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
+                    encoder = BertModel(enc_bert_config,
+                                                    bert_word_dropout=opt.enc_pretrain_word_dropout,
+                                                    bert_emb_dropout=opt.enc_pretrain_emb_dropout,
+                                                    bert_atten_dropout=opt.enc_pretrain_attn_dropout,
+                                                    bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
+                                                    bert_hidden_size=opt.enc_pretrain_hidden_size,
+                                                    is_decoder=False,
+                                               )
+                elif opt.enc_pretrained_model == "roberta":
+                    from pretrain_module.configuration_roberta import RobertaConfig
+                    from pretrain_module.modeling_roberta import RobertaModel
+
+                    enc_roberta_config = RobertaConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
+                    encoder = RobertaModel(enc_roberta_config,
+                                           bert_word_dropout=opt.enc_pretrain_word_dropout,
+                                           bert_emb_dropout=opt.enc_pretrain_emb_dropout,
+                                           bert_atten_dropout=opt.enc_pretrain_attn_dropout,
+                                           bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
+                                           bert_hidden_size=opt.enc_pretrain_hidden_size,
+                                           is_decoder=False,
+                                           encoder_normalize_before=opt.enc_ln_before,
+                                         )
+                    print(opt.enc_ln_before,"enc_ln_before")
+                else:
+                    print("Warning: now only bert and roberta pretrained models are implemented:")
+                    exit(-1)
+
+
+                print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
+                if opt.enc_not_load_state:
+                    print("We do not load the state from pytorch")
+                else:
+                    enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
+                    print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
+
+                    enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
+
+                    encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
+                                            model=encoder,
+                                            output_loading_info=True,
+                                            state_dict=enc_model_state_dict,
+                                            model_prefix=opt.enc_pretrained_model
+                                            )
 
             encoder.enc_pretrained_model = opt.enc_pretrained_model
-
-            print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
-            if opt.enc_not_load_state:
-                print("We do not load the state from pytorch")
-            else:
-                enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
-                print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
-
-                enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
-
-                encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
-                                        model=encoder,
-                                        output_loading_info=True,
-                                        state_dict=enc_model_state_dict,
-                                        model_prefix=opt.enc_pretrained_model
-                                        )
-
         else:
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
 
         if opt.dec_pretrained_model == "transformer":
-            print("Pretrained model is not applied to decoder")
+            print("Decoder is not initialized from pretrained model")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
 
         elif opt.dec_pretrained_model == "bert":
@@ -226,15 +237,15 @@ def build_tm_model(opt, dicts):
         init.xavier_uniform_(g.linear.weight)
 
     if opt.init_embedding == 'xavier':
-        if model.encoder.enc_pretrained_model is None:
+        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
             init.xavier_uniform_(model.encoder.word_lut.weight)
-        if model.decoder.dec_pretrained_model is None:
+        if model.decoder.dec_pretrained_model == "transformer":
             init.xavier_uniform_(model.decoder.word_lut.weight)
 
     elif opt.init_embedding == 'normal':
-        if model.encoder.enc_pretrained_model is None:
+        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut  is not None:
             init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
-        if model.decoder.dec_pretrained_model is None:
+        if model.decoder.dec_pretrained_model == "transformer":
             init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
 
     return model

@@ -55,7 +55,7 @@ class TransformerEncoder(nn.Module):
 
     """
 
-    def __init__(self, opt, vec_linear, positional_encoder, encoder_type='text'):
+    def __init__(self, opt, embeddings, positional_encoder, encoder_type='text'):
 
         super(TransformerEncoder, self).__init__()
 
@@ -69,12 +69,11 @@ class TransformerEncoder(nn.Module):
             self.layers = opt.encoder_layers
         else:
             self.layers = opt.layers
-        self.dropout = opt.dropout
-        self.word_dropout = opt.word_dropout
-        self.attn_dropout = opt.attn_dropout
-        self.emb_dropout = opt.emb_dropout
-        self.bert_dropout = nn.Dropout(opt.bert_output_dropout)
-
+        self.enc_hidden_dropout = opt.dec_hidden_dropout
+        self.enc_attn_dropout = opt.dec_attn_dropout
+        self.enc_emb_dropout = opt.dec_emb_dropout
+        if opt.get_context_emb is None:
+            self.enc_word_dropout = opt.dec_word_dropout
         self.time = opt.time
         self.version = opt.version
         self.input_type = encoder_type
@@ -86,13 +85,12 @@ class TransformerEncoder(nn.Module):
 
         # disable word dropout when switch out is in action
         if self.switchout > 0.0:
-            self.word_dropout = 0.0
+            self.enc_word_dropout = 0.0
 
         feature_size = opt.input_size
         self.channels = 1  # n. audio channels
 
-        self.word_lut = None  # 【4*768， model_size】
-        self.vec_linear = vec_linear # 【bert_hidden_size， transformer_model_size】
+        self.word_lut = embeddings 
 
         if opt.time == 'positional_encoding':
             self.time_transformer = positional_encoder
@@ -101,7 +99,7 @@ class TransformerEncoder(nn.Module):
         elif opt.time == 'lstm':
             self.time_transformer = nn.LSTM(self.model_size, self.model_size, 1, batch_first=True)
 
-        self.preprocess_layer = PrePostProcessing(self.model_size, self.emb_dropout, sequence='d',
+        self.preprocess_layer = PrePostProcessing(self.model_size, self.enc_emb_dropout, sequence='d',
                                                   variational=self.varitional_dropout)
 
         self.postprocess_layer = PrePostProcessing(self.model_size, 0, sequence='n')
@@ -113,8 +111,8 @@ class TransformerEncoder(nn.Module):
 
     def build_modules(self):
         self.layer_modules = nn.ModuleList(
-            [EncoderLayer(self.n_heads, self.model_size, self.dropout, self.inner_size,
-                          self.attn_dropout, variational=self.varitional_dropout) for _ in
+            [EncoderLayer(self.n_heads, self.model_size, self.enc_hidden_dropout, self.inner_size,
+                          self.enc_attn_dropout, variational=self.varitional_dropout) for _ in
              range(self.layers)])
 
     def forward(self, src, bert_vecs, **kwargs):
@@ -135,17 +133,17 @@ class TransformerEncoder(nn.Module):
             mask_src = src.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
 
             # before the .half(), bert_vecs is torch.cuda.FloatTensor, after : torch.cuda.HalfTensor
-            if self.fp16:
-                #print("yes fp16")
-                bert_vecs = bert_vecs.half()
-
-            # 对bert 的词向量做dropout
-            emb = self.bert_dropout(bert_vecs)
-            if self.vec_linear:
-                emb = self.vec_linear(emb)
-
+            if bert_vecs is not None:
+                assert self.word_lut is None
+                if self.fp16:
+                    bert_vecs = bert_vecs.half()
+                emb = bert_vecs
+            else:
+                assert self.word_lut is not None
+                emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
         else:
             raise NotImplementedError
+
 
         if torch_version >= 1.2:
             mask_src = mask_src.bool()
@@ -475,10 +473,21 @@ class Transformer(NMTModel):
         src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
 
         segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()
-        encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask)
 
-        # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
-        context = encoder_outputs[0]
+        if  self.encoder.enc_pretrained_model == "transformer":
+            if hasattr(self, 'pretrain_emb'):
+                pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
+                embeddings = pretrain_emb_outputs[0]
+                encoder_output = self.encoder(src, embeddings)  # as src and bert_vecs, both of them are batch first
+            else: 
+                encoder_output = self.encoder(src)
+            context = encoder_output['context']
+        else:
+            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
+            # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
+            context = encoder_outputs[0]
+
+
 
         # zero out the encoder part for pre-training
         if zero_encoder:
