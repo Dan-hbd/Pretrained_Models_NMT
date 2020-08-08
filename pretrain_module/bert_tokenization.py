@@ -23,7 +23,9 @@ def tokenize_data(raw_data, tokenizer, lang):
             sent = line.strip()
             # 我这里特意用marked_sent 是为了说明，不管是src还是tgt我没有加CLS SEP
             if lang == "en":
-                marked_sent = "<s> " + sent + " </s>"
+            # 虽然我们把字典里的"[CLS] 换成了<s>，但是因为我们这里用的tokenizer,还是要用原来的特殊字符,否则tokenize会出问题"
+                #marked_sent = "<s> " + sent + " </s>"
+                marked_sent = "[CLS] " + sent + " [SEP]"
             elif lang == "zh":
                 marked_sent = sent
             tokenized_sent = tokenizer.tokenize(marked_sent)
