@@ -58,6 +58,11 @@ def make_parser(parser):
     parser.add_argument('-enc_not_load_state', action='store_true',
                         help='only create a  Bert Object, not load the state from pytorch modle or fituned model for src')
 
+    parser.add_argument('-enc_ln_before', action='store_true',
+                        help='layernormalization before output for encoder')
+    parser.add_argument('-dec_ln_before', action='store_true',
+                        help='layernormalization before output for decoder')
+
     parser.add_argument('-dec_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model.""")
     parser.add_argument('-dec_state_dict', default="", type=str,

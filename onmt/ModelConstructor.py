@@ -114,7 +114,8 @@ def build_tm_model(opt, dicts):
                                                 bert_emb_dropout=opt.enc_pretrain_emb_dropout,
                                                 bert_atten_dropout=opt.enc_pretrain_attn_dropout,
                                                 bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
-                                                bert_hidden_size=opt.enc_pretrain_hidden_size
+                                                bert_hidden_size=opt.enc_pretrain_hidden_size,
+                                                is_decoder=False,
                                            )
             elif opt.enc_pretrained_model == "roberta":
                 from pretrain_module.configuration_roberta import RobertaConfig
@@ -122,12 +123,16 @@ def build_tm_model(opt, dicts):
 
                 enc_roberta_config = RobertaConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
                 encoder = RobertaModel(enc_roberta_config,
-                                                bert_word_dropout=opt.enc_pretrain_word_dropout,
-                                                bert_emb_dropout=opt.enc_pretrain_emb_dropout,
-                                                bert_atten_dropout=opt.enc_pretrain_attn_dropout,
-                                                bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
-                                                bert_hidden_size=opt.enc_pretrain_hidden_size
+                                       bert_word_dropout=opt.enc_pretrain_word_dropout,
+                                       bert_emb_dropout=opt.enc_pretrain_emb_dropout,
+                                       bert_atten_dropout=opt.enc_pretrain_attn_dropout,
+                                       bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
+                                       bert_hidden_size=opt.enc_pretrain_hidden_size,
+                                       is_decoder=False,
+                                       encoder_normalize_before=opt.enc_ln_before,
                                      )
+                print(opt.enc_ln_before,"enc_ln_before")
+                print(encoder)
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)

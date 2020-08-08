@@ -650,7 +650,8 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin):
         state_dict = kwargs.pop("state_dict", None)
         output_loading_info = kwargs.pop("output_loading_info", False)
         model_prefix = kwargs.pop("model_prefix", False)
-        is_decoder = kwargs.pop("is_decoder", False)
+        #is_decoder = kwargs.pop("is_decoder", False)
+        #encoder_normalize_before = kwargs.pop("encoder_normalize_before", False)
 
         #
         # cache_dir = kwargs.pop("cache_dir", None)

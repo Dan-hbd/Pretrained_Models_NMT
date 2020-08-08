@@ -802,7 +802,9 @@ class BertModel(BertPreTrainedModel):
                  bert_atten_dropout=None,
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
-                 is_decoder=False):
+                 is_decoder=None,
+                 encoder_normalize_before=None
+                 ):
 
         super().__init__(config)
         self.config = config
@@ -818,9 +820,14 @@ class BertModel(BertPreTrainedModel):
             self.config.bert_hidden_size=bert_hidden_size
         if is_decoder is not None:
             self.config.is_decoder=is_decoder
+        if encoder_normalize_before is not None:
+            self.config.encoder_normalize_before=encoder_normalize_before
 
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
+
+        if encoder_normalize_before:
+            self.emb_layer_norm = BertLayerNorm(self.config.hidden_size, eps=config.layer_norm_eps)
         # self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -917,7 +924,11 @@ class BertModel(BertPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        sequence_output = encoder_outputs[0]
+        if self.config.encoder_normalize_before:
+            sequence_output = self.emb_layer_norm(encoder_outputs[0])
+        else:
+            sequence_output = encoder_outputs[0]
+            
         # pooled_output = self.pooler(sequence_output)
         # if not return_dict:
         #     return (sequence_output, pooled_output) + encoder_outputs[1:]
