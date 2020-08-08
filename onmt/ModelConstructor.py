@@ -132,7 +132,6 @@ def build_tm_model(opt, dicts):
                                        encoder_normalize_before=opt.enc_ln_before,
                                      )
                 print(opt.enc_ln_before,"enc_ln_before")
-                print(encoder)
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)

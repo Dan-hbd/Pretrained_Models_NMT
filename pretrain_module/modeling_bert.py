@@ -802,8 +802,8 @@ class BertModel(BertPreTrainedModel):
                  bert_atten_dropout=None,
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
-                 is_decoder=None,
-                 encoder_normalize_before=None
+                 is_decoder=False,
+                 encoder_normalize_before=False
                  ):
 
         super().__init__(config)
@@ -818,15 +818,14 @@ class BertModel(BertPreTrainedModel):
             self.config.bert_hidden_dropout=bert_hidden_dropout
         if bert_hidden_size is not None:
             self.config.bert_hidden_size=bert_hidden_size
-        if is_decoder is not None:
-            self.config.is_decoder=is_decoder
-        if encoder_normalize_before is not None:
-            self.config.encoder_normalize_before=encoder_normalize_before
+
+        self.config.is_decoder=is_decoder
+        self.config.encoder_normalize_before=encoder_normalize_before
 
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
 
-        if encoder_normalize_before:
+        if self.config.encoder_normalize_before:
             self.emb_layer_norm = BertLayerNorm(self.config.hidden_size, eps=config.layer_norm_eps)
         # self.pooler = BertPooler(config)
 
