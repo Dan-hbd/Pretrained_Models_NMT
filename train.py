@@ -193,7 +193,7 @@ def main():
 
     model = build_model(opt, dicts)
 
-    if opt.get_context_emb is not None:
+    if opt.get_context_emb is not "":
         assert opt.enc_pretrained_model == "transformer"
         assert opt.dec_pretrained_model == "transformer"
         print("We use pretrained model to get contextualized embeddings and feed them to the original transformer")

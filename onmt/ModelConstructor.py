@@ -49,6 +49,11 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'variational_dropout'):
         opt.variational_dropout = False
 
+    if not hasattr(opt, 'enc_ln_before'):
+        opt.enc_ln_before = False
+    if not hasattr(opt, 'get_context_emb'):
+        opt.get_context_emb = ""
+
     if opt.enc_pretrained_model == 'bert':
         onmt.Constants.SRC_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.BERT_UNK
@@ -89,14 +94,16 @@ def build_tm_model(opt, dicts):
     # BUILD GENERATOR
     generators = [onmt.modules.BaseModel.Generator(opt.model_size, dicts['tgt'].size())]
 
-    if 'src' in dicts and opt.get_context_emb is None and opt.enc_pretrained_model == "transformer":
-        assert opt.enc_pretrained_model=="transformer"
+    if 'src' in dicts and opt.get_context_emb == "" and opt.enc_pretrained_model == "transformer":
         assert opt.dec_pretrained_model=="transformer"
         embedding_src = nn.Embedding(dicts['src'].size(),
         opt.model_size,
         padding_idx = onmt.Constants.SRC_PAD)
     else:
         embedding_src = None
+
+
+    embedding_src = None
 
     if opt.join_embedding and embedding_src is not None:
         embedding_tgt = embedding_src
@@ -113,6 +120,7 @@ def build_tm_model(opt, dicts):
             if opt.enc_pretrained_model == "transformer":
                 print("Encoder is not initialized from pretrained model")
                 encoder = TransformerEncoder(opt, embedding_src, positional_encoder, opt.encoder_type)
+
             else:
                 print("Build a pretrained model: {}, for encoder".format(opt.enc_pretrained_model))
                 if opt.enc_pretrained_model == "bert":
@@ -142,73 +150,79 @@ def build_tm_model(opt, dicts):
                                            is_decoder=False,
                                            encoder_normalize_before=opt.enc_ln_before,
                                          )
-                    print(opt.enc_ln_before,"enc_ln_before")
+                    print("enc_ln_beforei:",opt.enc_ln_before,)
                 else:
                     print("Warning: now only bert and roberta pretrained models are implemented:")
                     exit(-1)
 
-
-                print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
-                if opt.enc_not_load_state:
-                    print("We do not load the state from pytorch")
-                else:
-                    enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
-                    print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
-
-                    enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
-
-                    encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
-                                            model=encoder,
-                                            output_loading_info=True,
-                                            state_dict=enc_model_state_dict,
-                                            model_prefix=opt.enc_pretrained_model
-                                            )
-
             encoder.enc_pretrained_model = opt.enc_pretrained_model
+
+            print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
+            if opt.enc_not_load_state:
+                print("We do not load the state from pytorch")
+            else:
+                enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
+                print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
+                print("The pretrained model is:",opt.enc_not_load_state)
+
+                enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
+
+                encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
+                                        model=encoder,
+                                        output_loading_info=True,
+                                        state_dict=enc_model_state_dict,
+                                        model_prefix=opt.enc_pretrained_model
+                                        )
+
         else:
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
 
         if opt.dec_pretrained_model == "transformer":
-            print("Decoder is not initialized from pretrained model")
+            print("Pretrained model is not applied to decoder")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
-
-        elif opt.dec_pretrained_model == "bert":
+        else:
             print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
-            if opt.enc_pretrained_model != "bert":
-                from pretrain_module.configuration_roberta import RobertaConfig
-                from pretrain_module.modeling_roberta import RobertaModel
-            dec_bert_config = BertConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
-            decoder = BertModel(dec_bert_config,
-                                bert_word_dropout=opt.dec_pretrain_word_dropout,
-                                bert_emb_dropout=opt.dec_pretrain_emb_dropout,
-                                bert_atten_dropout=opt.dec_pretrain_attn_dropout,
-                                bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
-                                bert_hidden_size=opt.dec_pretrain_hidden_size,
-                                is_decoder=True,
-                                )
-
-        elif opt.dec_pretrained_model == "roberta":
-            print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
-            if opt.enc_pretrained_model != "roberta":
-                from pretrain_module.configuration_roberta import RobertaConfig
-                from pretrain_module.modeling_roberta import RobertaModel
-
-            dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
-            decoder = RobertaModel(dec_roberta_config,
+            if opt.dec_pretrained_model == "bert":
+                if opt.enc_pretrained_model != "bert":
+                    from pretrain_module.configuration_roberta import RobertaConfig
+                    from pretrain_module.modeling_roberta import RobertaModel
+                dec_bert_config = BertConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
+                decoder = BertModel(dec_bert_config,
                                     bert_word_dropout=opt.dec_pretrain_word_dropout,
                                     bert_emb_dropout=opt.dec_pretrain_emb_dropout,
                                     bert_atten_dropout=opt.dec_pretrain_attn_dropout,
                                     bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
                                     bert_hidden_size=opt.dec_pretrain_hidden_size,
                                     is_decoder=True,
-                                 )
+                                    )
+
+            elif opt.dec_pretrained_model == "roberta":
+                print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
+                if opt.enc_pretrained_model != "roberta":
+                    from pretrain_module.configuration_roberta import RobertaConfig
+                    from pretrain_module.modeling_roberta import RobertaModel
+
+                dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
+                decoder = RobertaModel(dec_roberta_config,
+                                        bert_word_dropout=opt.dec_pretrain_word_dropout,
+                                        bert_emb_dropout=opt.dec_pretrain_emb_dropout,
+                                        bert_atten_dropout=opt.dec_pretrain_attn_dropout,
+                                        bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
+                                        bert_hidden_size=opt.dec_pretrain_hidden_size,
+                                        is_decoder=True,
+                                     )
+            else:
+                print("Warning: now only bert and roberta pretrained models are implemented:")
+                exit(-1)
+            
             if opt.dec_not_load_state:
                 print("We don't load the state for pretrained model of decoder from pytorch")
 
             else:
                 dec_state_dict_file=opt.dec_pretrained_config_dir + "/" + opt.dec_state_dict
                 print("After builing pretrained model we load the state from:\n",dec_state_dict_file)
+                print("The pretrained model is:",opt.dec_pretrained_model)
 
                 dec_model_state_dict = torch.load(dec_state_dict_file, map_location="cpu")
 
@@ -220,9 +234,6 @@ def build_tm_model(opt, dicts):
                                         )
 
 
-        else:
-            print("Unknown decoder pretrained model :", opt.dec_pretrained_model)
-            exit(-1)
         decoder.dec_pretrained_model = opt.dec_pretrained_model
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
 
@@ -239,14 +250,16 @@ def build_tm_model(opt, dicts):
     if opt.init_embedding == 'xavier':
         if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
             init.xavier_uniform_(model.encoder.word_lut.weight)
-        if model.decoder.dec_pretrained_model == "transformer":
+        if model.decoder.dec_pretrained_model == "transformer" and model.decoder.word_lut is not None:
             init.xavier_uniform_(model.decoder.word_lut.weight)
 
     elif opt.init_embedding == 'normal':
-        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut  is not None:
+        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
             init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
-        if model.decoder.dec_pretrained_model == "transformer":
-            init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
+        if model.decoder.dec_pretrained_model == "transformer" and model.decoder.word_lut is not None:
+            #init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
+            print("yes-----------~~") 
+            print(model.decoder.word_lut.weight)
 
     return model
 
