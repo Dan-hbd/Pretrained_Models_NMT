@@ -482,11 +482,13 @@ class Transformer(NMTModel):
             else: 
                 encoder_output = self.encoder(src)
             context = encoder_output['context']
-        else:
+        elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta" :
             encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
             # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
             context = encoder_outputs[0]
-
+        else:
+            print("wrong enc_pretrained_model")
+            exit(-1)
 
 
         # zero out the encoder part for pre-training
@@ -512,6 +514,7 @@ class Transformer(NMTModel):
                                           token_type_ids=tgt_token_type,
                                           encoder_hidden_states=context,
                                           encoder_attention_mask=src_attention_mask)
+            decoder_output = decoder_output[0]
             decoder_output = decoder_output.transpose(0,1)
             output = decoder_output
 
@@ -556,26 +559,22 @@ class Transformer(NMTModel):
         tgt_atb = batch.get('target_atb')  # a dictionary of attributes
 
         # transpose to make batch_size first (batch_size, seq_len)
-        src = src.transpose(0, 1)
+        src = src.transpose(0, 1)  #[b, src_len]
         tgt_input = tgt_input.transpose(0, 1)
         batch_size = tgt_input.size(0)
-        input_mask = src.ne(0).long()
 
-        # by me
-        segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()
-        bert_all_layers, _ = self.bert(src, segments_tensor, input_mask)
+        src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
+        segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()  #[b, src_len]
 
-        # tensors: (batch_size, seq_len, dim)    mask : (batch_size, seq_len)
-        scalar_vec = hasattr(self,'scalar_mix')
-        if scalar_vec:
-            bert_vec = self.scalar_mix(bert_all_layers, input_mask)
+        if self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta" :
+            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
+            # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
+            context = encoder_outputs[0]
         else:
-            bert_vec = bert_all_layers[-1]
+            print("wrong enc_pretrained_model")
+            exit(-1)
 
-        encoder_output = self.bert(src, bert_vec)
-
-        # by me
-        context = encoder_output['context']
+        # we don't have target, so check this part later
 
         if hasattr(self, 'autoencoder') and self.autoencoder \
                 and self.autoencoder.representation == "EncoderHiddenState":
@@ -609,7 +608,7 @@ class Transformer(NMTModel):
     def renew_buffer(self, new_len):
         self.decoder.renew_buffer(new_len)
 
-    def step(self, input_t, decoder_state):
+    def step(self, tgt_inputs, decoder_state):
         """
         Decoding function:
         generate new decoder output based on the current input and current decoder state
@@ -619,16 +618,17 @@ class Transformer(NMTModel):
         :return: a dictionary containing: log-prob output and the attention coverage
         """
 
-        hidden, coverage = self.decoder.step(input_t, decoder_state)
+        hidden = self.decoder.step(tgt_inputs, decoder_state)
+        hidden =hidden.transpose(0,1)
         # squeeze to remove the time step dimension
         log_prob = self.generator[0](hidden.squeeze(0))
 
-        last_coverage = coverage[:, -1, :].squeeze(1)
+        # last_coverage = coverage[:, -1, :].squeeze(1)
 
         output_dict = defaultdict(lambda: None)
 
         output_dict['log_prob'] = log_prob
-        output_dict['coverage'] = last_coverage
+        # output_dict['coverage'] = last_coverage
 
         return output_dict
 
@@ -639,23 +639,35 @@ class Transformer(NMTModel):
         :param beam_size: Size of beam used in beam search
         :return:
         """
-        src = batch.get('source')
+        src = batch.get('source') # [src_len, bsz]
         tgt_atb = batch.get('target_atb')
-        src_transposed = src.transpose(0, 1)  # make batch_size first (batch_size, seq_len)
+        src_transposed = src.transpose(0, 1)  # make batch_size first (batch_size, src_len)
         segments_tensor = src_transposed.ne(onmt.Constants.SRC_PAD).long()
-        input_mask = src_transposed.ne(onmt.Constants.SRC_PAD).long()
+        src_attention_mask = src_transposed.ne(onmt.Constants.SRC_PAD).long()  #[batch_size, src_len]
 
         # by me
-        encoder_outputs = self.encoder(src_transposed, segments_tensor, input_mask)
+        # encoder_outputs = self.encoder(src_transposed, segments_tensor, input_mask)
 
-        context = encoder_outputs[0]
-        # context [batch_size , len, hidden] => [len, batch_size, hidden] 
-        context = context.transpose(0, 1) 
+        if  self.encoder.enc_pretrained_model == "transformer":
+            print("The code here needs to be checked")
+            exit(-1)
+            # if hasattr(self, 'pretrain_emb'):
+            #     pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
+            #     embeddings = pretrain_emb_outputs[0]
+            #     encoder_output = self.encoder(src, embeddings)  # as src and bert_vecs, both of them are batch first
+            # else:
+            #     encoder_output = self.encoder(src)
+            # context = encoder_output['context']
+        elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
+            encoder_outputs = self.encoder(src_transposed, segments_tensor, src_attention_mask) # the encoder is a pretrained model
+            context = encoder_outputs[0]  # [batch_size , len, hidden]
+            # context [batch_size , len, hidden] => [len, batch_size, hidden]
+            context = context.transpose(0, 1)
 
-        # by me
-        # src_transposed 是batch first
-        # [batch_size , len] => [batchsize, 1, len] padding位置True
-        mask_src = src_transposed.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
+        # src_transposed: batch first
+        # [batch_size , len] => [batchsize, 1, len] 非padding位置True
+        # src: time first
+        mask_src = src_transposed.ne(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
         decoder_state = TransformerDecodingState(src, tgt_atb, context, mask_src,
                                                  beam_size=beam_size, model_size=self.model_size, type=type)
 
@@ -831,4 +843,5 @@ class TransformerDecodingState(DecoderState):
             if buffer_ is not None:
                 for k in buffer_.keys():
                     t_, br_, d_ = buffer_[k].size()
-                    buffer_[k] = buffer_[k].index_select(1, reorder_state)  # 1 for time first
+                    # buffer_[k] = buffer_[k].index_select(1, reorder_state)  # 1 for time first
+                    buffer_[k] = buffer_[k].index_select(0, reorder_state)  # 1  for batch first

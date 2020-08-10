@@ -431,7 +431,7 @@ class FastTranslator(Translator):
             attns[i] = decoder_output['coverage']
 
         out = self._combine_outputs(outs)
-        attn = self._combine_attention(attns)
+        #attn = self._combine_attention(attns)
         # attn = attn[:, -1, :] # I dont know what this line means
         attn = None # lol this is never used probably
 

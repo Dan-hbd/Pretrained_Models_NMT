@@ -117,7 +117,9 @@ def build_tm_model(opt, dicts):
         onmt.Constants.init_value = opt.param_init
 
         if opt.encoder_type == "text":
+            print("Building Encoder start")
             if opt.enc_pretrained_model == "transformer":
+                opt.init_embedding ='normal'
                 print("Encoder is not initialized from pretrained model")
                 encoder = TransformerEncoder(opt, embedding_src, positional_encoder, opt.encoder_type)
 
@@ -177,16 +179,17 @@ def build_tm_model(opt, dicts):
         else:
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
-
+        
+        print("\n","Building Decoder start")
         if opt.dec_pretrained_model == "transformer":
-            print("Pretrained model is not applied to decoder")
+            print("Decoder is not initialized from pretrained model")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
         else:
-            print("Pretrained model {} is applied to decoder".format(opt.dec_pretrained_model))
+            print("Build a pretrained model: {}, for decoder".format(opt.dec_pretrained_model))
             if opt.dec_pretrained_model == "bert":
                 if opt.enc_pretrained_model != "bert":
-                    from pretrain_module.configuration_roberta import RobertaConfig
-                    from pretrain_module.modeling_roberta import RobertaModel
+                    from pretrain_module.configuration_bert import BertConfig
+                    from pretrain_module.modeling_bert import BertModel
                 dec_bert_config = BertConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
                 decoder = BertModel(dec_bert_config,
                                     bert_word_dropout=opt.dec_pretrain_word_dropout,
@@ -257,9 +260,7 @@ def build_tm_model(opt, dicts):
         if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
             init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
         if model.decoder.dec_pretrained_model == "transformer" and model.decoder.word_lut is not None:
-            #init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
-            print("yes-----------~~") 
-            print(model.decoder.word_lut.weight)
+            init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
 
     return model
 

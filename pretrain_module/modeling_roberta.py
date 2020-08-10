@@ -81,6 +81,7 @@ class RobertaEmbeddings(nn.Module):
         embeddings = words_embeddings + position_embeddings
         return embeddings
 
+
     def create_position_ids_from_inputs_embeds(self, inputs_embeds):
         """ We are provided embeddings directly. We cannot infer which are padded so just generate
         sequential position ids.

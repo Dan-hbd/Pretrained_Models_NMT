@@ -171,8 +171,13 @@ def make_parser(parser):
                         help="Type of encoder to use. Options are [text|img].")
     parser.add_argument('-input_size', type=int, default=2048,
                         help='Size of input features')  
-    parser.add_argument('-init_embedding', default='normal',
+#    parser.add_argument('-init_embedding', default='normal',
+#                        help="How to init the embedding matrices. Xavier or Normal.")
+
+    # if we initialze the encoder with pretrained models we set this to ""
+    parser.add_argument('-init_embedding', default='',
                         help="How to init the embedding matrices. Xavier or Normal.")
+
     parser.add_argument('-batch_size_words', type=int, default=2048,
                         help='Maximum batch size in word dimension')
     parser.add_argument('-batch_size_sents', type=int, default=128,
