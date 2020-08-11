@@ -1101,7 +1101,7 @@ class BertModel(BertPreTrainedModel):
         if self.config.encoder_normalize_before:
             sequence_output = self.emb_layer_norm(encoder_outputs[0])
         else:
-            sequence_output = encoder_outputs[0]
+            sequence_output = encoder_outputs[0]            
             
         # pooled_output = self.pooler(sequence_output)
         # if not return_dict:
@@ -1179,7 +1179,7 @@ class BertModel(BertPreTrainedModel):
             hidden_states = layer_outputs[0]
             decoder_state.update_attention_buffer(buffer, i)
 
-        return hidden_states
+        return hidden_states,buffers[i] 
 
 
     def renew_buffer(self, new_len):

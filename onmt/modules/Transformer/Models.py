@@ -154,7 +154,6 @@ class TransformerEncoder(nn.Module):
         """ Adding positional encoding """
         emb = self.time_transformer(emb)
         # B x T x H -> T x B x H
-        # 只是emb加上positional encoding后做了一下transpose
         context = emb.transpose(0, 1)
 
         context = self.preprocess_layer(context)
@@ -484,7 +483,6 @@ class Transformer(NMTModel):
             context = encoder_output['context']
         elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta" :
             encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
-            # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
             context = encoder_outputs[0]
         else:
             print("wrong enc_pretrained_model")
@@ -558,8 +556,7 @@ class Transformer(NMTModel):
         tgt_output = batch.get('target_output')
         tgt_atb = batch.get('target_atb')  # a dictionary of attributes
 
-        # transpose to make batch_size first (batch_size, seq_len)
-        src = src.transpose(0, 1)  #[b, src_len]
+        src = src.transpose(0, 1)  # [src_len, b] => [b, src_len]
         tgt_input = tgt_input.transpose(0, 1)
         batch_size = tgt_input.size(0)
 
@@ -618,12 +615,16 @@ class Transformer(NMTModel):
         :return: a dictionary containing: log-prob output and the attention coverage
         """
 
-        hidden = self.decoder.step(tgt_inputs, decoder_state)
-        hidden =hidden.transpose(0,1)
-        # squeeze to remove the time step dimension
-        log_prob = self.generator[0](hidden.squeeze(0))
+        hidden,_ = self.decoder.step(tgt_inputs, decoder_state)
 
-        # last_coverage = coverage[:, -1, :].squeeze(1)
+        # make time first
+        if self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model == "roberta":
+            hidden = hidden.transpose(0, 1)
+        elif self.decoder.dec_pretrained_model == "transformer":
+            hidden=hidden
+        else:
+            raise NotImplementedError
+        log_prob = self.generator[0](hidden.squeeze(0))
 
         output_dict = defaultdict(lambda: None)
 
@@ -646,7 +647,6 @@ class Transformer(NMTModel):
         src_attention_mask = src_transposed.ne(onmt.Constants.SRC_PAD).long()  #[batch_size, src_len]
 
         # by me
-        # encoder_outputs = self.encoder(src_transposed, segments_tensor, input_mask)
 
         if  self.encoder.enc_pretrained_model == "transformer":
             print("The code here needs to be checked")
@@ -661,26 +661,35 @@ class Transformer(NMTModel):
         elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
             encoder_outputs = self.encoder(src_transposed, segments_tensor, src_attention_mask) # the encoder is a pretrained model
             context = encoder_outputs[0]  # [batch_size , len, hidden]
-            # context [batch_size , len, hidden] => [len, batch_size, hidden]
-            context = context.transpose(0, 1)
+            context = context.transpose(0, 1)  # [batch_size , len, hidden] => [len, batch_size, hidden]
 
         # src_transposed: batch first
         # [batch_size , len] => [batchsize, 1, len] 非padding位置True
         # src: time first
         mask_src = src_transposed.ne(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
-        decoder_state = TransformerDecodingState(src, tgt_atb, context, mask_src,
-                                                 beam_size=beam_size, model_size=self.model_size, type=type)
+        dec_pretrained_model=self.decoder.dec_pretrained_model
+        if dec_pretrained_model == "transformer":
+            mask_src = src_transposed.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
+        elif dec_pretrained_model == "bert" or dec_pretrained_model == "roberta":
+            mask_src = src_transposed.ne(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
+        else:
+            print("Warning: unknown dec_pretrained_model")
+            raise NotImplementedError
 
-        return decoder_state
+        decoder_state = TransformerDecodingState(src, tgt_atb, context, mask_src,
+                                             beam_size=beam_size, model_size=self.model_size, type=type, dec_pretrained_model=dec_pretrained_model)
+
+        return decoder_state  
 
 
 class TransformerDecodingState(DecoderState):
 
-    def __init__(self, src, tgt_atb, context, src_mask, beam_size=1, model_size=512, type=1):
+    def __init__(self, src, tgt_atb, context, src_mask, beam_size=1, model_size=512, type=1, dec_pretrained_model="transformer"):
 
         self.beam_size = beam_size
         self.model_size = model_size
         self.attention_buffers = dict()
+        self.dec_pretrained_model = dec_pretrained_model
 
         if type == 1:
             # if audio only take one dimension since only used for mask
@@ -843,5 +852,11 @@ class TransformerDecodingState(DecoderState):
             if buffer_ is not None:
                 for k in buffer_.keys():
                     t_, br_, d_ = buffer_[k].size()
-                    # buffer_[k] = buffer_[k].index_select(1, reorder_state)  # 1 for time first
-                    buffer_[k] = buffer_[k].index_select(0, reorder_state)  # 1  for batch first
+                    if self.dec_pretrained_model == "transformer":
+                        buffer_[k] = buffer_[k].index_select(1, reorder_state)  # 1 for time first
+                    elif self.dec_pretrained_model == "bert" or  self.dec_pretrained_model == "roberta": 
+                        buffer_[k] = buffer_[k].index_select(0, reorder_state)  # 0 for batch first
+                    else:
+                        raise NotImplementedError 
+
+

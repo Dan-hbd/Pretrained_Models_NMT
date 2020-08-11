@@ -54,17 +54,33 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'get_context_emb'):
         opt.get_context_emb = ""
 
+
     if opt.enc_pretrained_model == 'bert':
         onmt.Constants.SRC_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.BERT_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.BERT_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.BERT_EOS
-    if opt.enc_pretrained_model == 'roberta':
+    elif opt.enc_pretrained_model == 'roberta':
         onmt.Constants.SRC_PAD = onmt.Constants.EN_ROBERTA_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.EN_ROBERTA_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.EN_ROBERTA_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.EN_ROBERTA_EOS
-
+    elif opt.enc_pretrained_model == 'transformer':
+        print("Warning: Please excute this experiment in another repo")
+        exit(-1)
+    else:
+        print("Warning: wrong enc_pretrained_model")
+        exit(-1)
+    
+    # 不管哪种structure的decoder,处理tgt数据要么用的bert 要么roberta的字典，中文的这两个预训练模型有相同的字典
+    if opt.dec_pretrained_model == 'bert' or opt.dec_pretrained_model == 'roberta' or opt.dec_pretrained_model == 'transformer':
+        onmt.Constants.TGT_PAD = onmt.Constants.BERT_PAD
+        onmt.Constants.TGT_UNK = onmt.Constants.BERT_UNK
+        onmt.Constants.TGT_BOS = onmt.Constants.BERT_BOS
+        onmt.Constants.TGT_EOS = onmt.Constants.BERT_EOS
+    else:
+        print("Warning: wrong dec_pretrained_model")
+        exit(-1)
 
 
 
@@ -164,8 +180,7 @@ def build_tm_model(opt, dicts):
                 print("We do not load the state from pytorch")
             else:
                 enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
-                print("After builing pretrained model we load the state from:\n",enc_state_dict_file)
-                print("The pretrained model is:",opt.enc_not_load_state)
+                print("Loading weights from pretrained:\n",enc_state_dict_file)
 
                 enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
 
@@ -180,7 +195,8 @@ def build_tm_model(opt, dicts):
             print("Unknown encoder type:", opt.encoder_type)
             exit(-1)
         
-        print("\n","Building Decoder start")
+        print("\n")
+        print("Building Decoder start")
         if opt.dec_pretrained_model == "transformer":
             print("Decoder is not initialized from pretrained model")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)

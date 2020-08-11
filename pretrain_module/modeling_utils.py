@@ -772,6 +772,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin):
 
         if len(unexpected_keys) > 0:
             print("Some weights of the pretrained model were not used")
+            print(unexpected_keys)
         else:
             print("All the weights of the pretrained model checkpoint were used")
 
