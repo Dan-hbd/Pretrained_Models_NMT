@@ -13,9 +13,9 @@ from transformers import RobertaTokenizer
 parser = argparse.ArgumentParser(description='preprocess.py')
 onmt.Markdown.add_md_help_argument(parser)
 
-parser.add_argument('-src_data', required=True,
+parser.add_argument('-src_data', default= "",
                     help="Path to the source data")
-parser.add_argument('-tgt_data', required=True,
+parser.add_argument('-tgt_data', default= "",
                     help="Path to the target data")
 
 opt = parser.parse_args()
@@ -60,8 +60,12 @@ def main():
     src_lang = "en"
     tgt_lang = "zh"
 
-    tokenize_data(opt.src_data, tokenizer_en, src_lang)
-    tokenize_data(opt.tgt_data, tokenizer_zh, tgt_lang)
+    if opt.src_data is not "": 
+        print("tokenzize src data")
+        tokenize_data(opt.src_data, tokenizer_en, src_lang)
+    if opt.tgt_data is not "": 
+        print("tokenzize tgt data")
+        tokenize_data(opt.tgt_data, tokenizer_zh, tgt_lang)
 
 
 if __name__ == "__main__":

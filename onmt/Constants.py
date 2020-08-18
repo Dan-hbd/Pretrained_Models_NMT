@@ -29,6 +29,12 @@ TGT_UNK_WORD = '[UNK]'
 TGT_BOS_WORD = '<s>'
 TGT_EOS_WORD = '</s>'
 
+PAD_WORD = '[PAD]'
+UNK_WORD = '[UNK]'
+BOS_WORD = '<s>'
+EOS_WORD = '</s>'
+
+
 
 checkpointing = 0
 static = False
