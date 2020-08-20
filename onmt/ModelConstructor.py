@@ -256,6 +256,7 @@ def build_tm_model(opt, dicts):
         decoder.dec_pretrained_model = opt.dec_pretrained_model
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
 
+
     else:
         raise NotImplementedError
 

@@ -71,6 +71,13 @@ def make_parser(parser):
 
 
 
+    parser.add_argument('-frozen_encoder', action='store_true',
+                        help='encoder is frozen, parameters of encoder is not trainable')
+
+#    parser.add_argument('-whole_model_statedict_file', default="", type=str,
+#                        help="""""")
+#
+
     # options of pretrained model for encoder and dec
     parser.add_argument('-enc_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")

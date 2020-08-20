@@ -384,9 +384,29 @@ class XETrainer(BaseTrainer):
                 resume=False
                 self.init_additional_data()
 
+#            del checkpoint['model']
+#            del checkpoint['optim']
+#            del checkpoint
+
+
+            if opt.frozen_encoder:
+                print("encoder will be frozen")
+                #checkpoint = torch.load(opt.whole_model_statedict_file, map_location="cpu")
+                model_state=checkpoint["model"]
+                #model.load_state_dict(model_state)
+                for param in self.model.encoder.parameters():
+                    param.requires_grad = False  # 设置参数不可导
+                print("The frozen parameters are as following " ) 
+                for key in model_state.keys():
+                    if key.startswith("encoder"):
+                        print(key)
+
+
             del checkpoint['model']
             del checkpoint['optim']
             del checkpoint
+
+
         else:
             batch_order = None
             iteration = 0
@@ -394,6 +414,20 @@ class XETrainer(BaseTrainer):
             init_model_parameters(model, opt)
             resume=False
             self.init_additional_data()
+
+
+
+        n_params = sum([p.nelement() for p in model.parameters()])
+        print('* number of all parameters: %d' % n_params)
+
+        n_params_grad = sum([p.nelement() for p in model.parameters() if p.requires_grad == True])
+        print('* number of all parameters that need gradient: %d' % n_params_grad)
+
+        n_params_nograd = sum([p.nelement() for p in model.parameters() if p.requires_grad == False])
+        print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
+
+        assert n_params == (n_params_grad + n_params_nograd)
+
 
         valid_loss = self.eval(self.valid_data)
         valid_ppl = math.exp(min(valid_loss, 100))
