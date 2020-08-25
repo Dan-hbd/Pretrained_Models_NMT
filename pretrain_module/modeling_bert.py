@@ -177,6 +177,7 @@ except ImportError:
     print("FusedLayerNorm is not available, we use torch.nn.LayerNorm")
     import torch.nn.LayerNorm as BertLayerNorm
 
+
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
     """
@@ -190,22 +191,18 @@ class BertEmbeddings(nn.Module):
         self.bert_word_dropout = config.bert_word_dropout
 
         self.LayerNorm = BertLayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-
-
+        self.dropout = nn.Dropout(config.bert_emb_dropout)
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
         seq_length = input_ids.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device)
-        #if seq_length > self.max_position_id-1:
         if seq_length > self.max_position_id:
             position_ids = torch.clamp(position_ids, 0, self.max_position_id-1)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids)
-
         # by me
         embed = self.word_embeddings
         if self.bert_word_dropout and self.training:
@@ -221,7 +218,6 @@ class BertEmbeddings(nn.Module):
             input_ids, masked_embed_weight, padding_idx, embed.max_norm,
             embed.norm_type, embed.scale_grad_by_freq, embed.sparse)
 
-        # words_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
@@ -237,7 +233,6 @@ class BertEmbeddings(nn.Module):
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
         if token_type_ids is None:
             token_type_ids = torch.zeros_like(input_ids)
-
 
         embed = self.word_embeddings
         masked_embed_weight = embed.weight
@@ -255,6 +250,7 @@ class BertEmbeddings(nn.Module):
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
 
 class BertSelfAttention(nn.Module):
     def __init__(self, config):
@@ -326,7 +322,6 @@ class BertSelfAttention(nn.Module):
             attention_probs = attention_probs * head_mask
 
         context_layer = torch.matmul(attention_probs, value_layer)
-
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
@@ -334,16 +329,15 @@ class BertSelfAttention(nn.Module):
         outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
         return outputs
 
-    def selfattn_step(
-            self,
-            hidden_states,
-            attention_mask,
-            head_mask,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            output_attentions=False,
-            buffer=None
-        ):
+    def selfattn_step(self,
+                      hidden_states,
+                      attention_mask,
+                      head_mask,
+                      encoder_hidden_states=None,
+                      encoder_attention_mask=None,
+                      output_attentions=False,
+                      buffer=None
+                      ):
         # hidden_size -> all_head_size: 767 -> 768
         proj_query = self.query(hidden_states)
         # If this is instantiated as a cross-attention module, the keys
@@ -411,89 +405,6 @@ class BertSelfAttention(nn.Module):
         return outputs, buffer
 
 
-# class RobertaSelfAttention(nn.Module):
-#     def __init__(self, config):
-#         super().__init__()
-#         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
-#             raise ValueError(
-#                 "The hidden size (%d) is not a multiple of the number of attention "
-#                 "heads (%d)" % (config.hidden_size, config.num_attention_heads)
-#             )
-#
-#         self.num_attention_heads = config.num_attention_heads
-#         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
-#         self.all_head_size = self.num_attention_heads * self.attention_head_size
-#         self.hidden_size=config.hidden_size
-#         self.scaling = self.attention_head_size ** -0.5
-#         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
-#
-#         # self.query = nn.Linear(config.hidden_size, self.all_head_size)
-#         # self.key = nn.Linear(config.hidden_size, self.all_head_size)
-#         # self.value = nn.Linear(config.hidden_size, self.all_head_size)
-#         self.in_proj_weight = Parameter(torch.Tensor(3 * self.hidden_size, self.hidden_size))
-#         self.in_proj_bias = Parameter(torch.Tensor(3 * self.hidden_size))
-#         # self.out_proj = nn.Linear(self.hidden_size, self.hidden_size)  # 放在 BertSelfOutput 层
-#         self.attndrop = config.attention_probs_dropout_prob
-#
-#
-#     def forward(
-#         self,
-#         hidden_states,
-#         attention_mask=None,
-#         head_mask=None,
-#         encoder_hidden_states=None,
-#         encoder_attention_mask=None,
-#         output_attentions=False,
-#     ):
-#         """Input shape: Time x Batch x Channel
-#         Timesteps can be masked by supplying a T x T mask in the
-#         `attn_mask` argument. Padding elements can be excluded from
-#         the key by passing a binary ByteTensor (`key_padding_mask`) with shape:
-#         batch x src_len, where padding elements are indicated by 1s.
-#         """
-#
-#         # If this is instantiated as a cross-attention module, the keys
-#         # and values come from an encoder; the attention mask needs to be
-#         # such that the encoder's padding tokens are not attended to.
-#         hidden_states =hidden_states.transpose(0,1)  # from batch first to not
-#         tgt_len, bsz, hidden_dim = hidden_states.size()
-#
-#         if encoder_hidden_states is not None:
-#             mixed_key_layer = self.key(encoder_hidden_states)
-#             mixed_value_layer = self.value(encoder_hidden_states)
-#             attention_mask = encoder_attention_mask
-#         else:
-#             weight = self.in_proj_weight  #[2304, 768]
-#             bias = self.in_proj_bias  #[2304]
-#
-#             qkv_output=F.linear(hidden_states, weight, bias)   #[15, 26, 2304]
-#             q,k,v = qkv_output.chunk(3,dim=-1)  # 分别是 [15, 26， 768]
-#
-#         q *= self.scaling
-#         q = q.contiguous().view(tgt_len, bsz * self.num_attention_heads, self.attention_head_size).transpose(0, 1) #[26*12, 15, 64]
-#         k = k.contiguous().view(-1, bsz * self.num_attention_heads, self.attention_head_size).transpose(0, 1)
-#         v = v.contiguous().view(-1, bsz * self.num_attention_heads, self.attention_head_size).transpose(0, 1)
-#         src_len = k.size(1)
-#
-#         attn_weights = torch.bmm(q, k.transpose(1, 2))   #[num_attention_heads*bsz,  tgt_len, attention_head_size]
-#         assert list(attn_weights.size()) == [bsz * self.num_attention_heads, tgt_len, src_len]
-#         attn_weights = attn_weights.view(bsz, self.num_attention_heads, tgt_len, src_len)
-#         # attn_weights = attn_weights.masked_fill(
-#         #     attention_mask.unsqueeze(1).unsqueeze(2),
-#         #     float('-inf'),
-#         # )
-#         attn_weights = attn_weights.view(bsz * self.num_attention_heads, tgt_len, src_len)
-#         attn_weights = F.softmax(attn_weights, dim=-1).type_as(attn_weights)
-#         attn_weights = F.dropout(attn_weights, p=self.attndrop, training=self.training)
-#         attn = torch.bmm(attn_weights, v)
-#         assert list(attn.size()) == [bsz * self.num_attention_heads, tgt_len, self.attention_head_size]
-#         context = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, self.hidden_size)
-#         context_layer = context.transpose(0,1)  # to batch first
-#         return (context_layer, )
-
-
-
-
 class BertSelfOutput(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -511,13 +422,8 @@ class BertSelfOutput(nn.Module):
 class BertAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
-        # if config.model_type == "roberta":
-        #     self.self = RobertaSelfAttention(config)
-        # else:
-        #     self.self = BertSelfAttention(config)
 
         self.self = BertSelfAttention(config)
-
         self.output = BertSelfOutput(config)
         self.pruned_heads = set()
 
@@ -692,9 +598,7 @@ class BertLayer(nn.Module):
         # 1.dropout(intermediate_output) 2. add(attention_output) 3.LN
         layer_output = self.output(intermediate_output, attention_output)
         outputs = (layer_output,) + outputs # 单纯的encoder的时候， outputs是空tuple(), outputs 表示attention
-
-        return outputs,buffer
-
+        return outputs, buffer
 
 
 class BertEncoder(nn.Module):
@@ -984,18 +888,18 @@ class BertModel(BertPreTrainedModel):
         super().__init__(config)
         self.config = config
         if bert_word_dropout is not None:
-            self.config.bert_word_dropout=bert_word_dropout
+            self.config.bert_word_dropout = bert_word_dropout
         if bert_emb_dropout is not None:
-            self.config.bert_emb_dropout=bert_emb_dropout
+            self.config.bert_emb_dropout = bert_emb_dropout
         if bert_atten_dropout is not None:
-            self.config.bert_atten_dropout=bert_atten_dropout
+            self.config.bert_atten_dropout = bert_atten_dropout
         if bert_hidden_dropout is not None:
-            self.config.bert_hidden_dropout=bert_hidden_dropout
+            self.config.bert_hidden_dropout = bert_hidden_dropout
         if bert_hidden_size is not None:
-            self.config.bert_hidden_size=bert_hidden_size
+            self.config.bert_hidden_size = bert_hidden_size
 
-        self.config.is_decoder=is_decoder
-        self.config.encoder_normalize_before=encoder_normalize_before
+        self.config.is_decoder = is_decoder
+        self.config.encoder_normalize_before = encoder_normalize_before
 
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
@@ -1157,7 +1061,7 @@ class BertModel(BertPreTrainedModel):
         if self.dec_pretrained_model == "bert":
             embedding_output = self.embeddings.emb_step(input_ids.size(1), input_, tgt_token_type)
         else:
-            print("Unknown dec_pretrained_model",self.dec_pretrained_model)
+            print("Unknown dec_pretrained_model", self.dec_pretrained_model)
             exit(-1)
 
 
