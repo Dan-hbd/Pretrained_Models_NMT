@@ -66,8 +66,10 @@ def build_model(opt, dicts):
         onmt.Constants.SRC_BOS = onmt.Constants.EN_ROBERTA_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.EN_ROBERTA_EOS
     elif opt.enc_pretrained_model == 'transformer':
-        print("Warning: Please excute this experiment in another repo")
-        exit(-1)
+        onmt.Constants.SRC_PAD = onmt.Constants.TRANSFORMER_PAD
+        onmt.Constants.SRC_UNK = onmt.Constants.TRANSFORMER_UNK
+        onmt.Constants.SRC_BOS = onmt.Constants.TRANSFORMER_BOS
+        onmt.Constants.SRC_EOS = onmt.Constants.TRANSFORMER_EOS
     else:
         print("Warning: wrong enc_pretrained_model")
         exit(-1)
@@ -111,23 +113,21 @@ def build_tm_model(opt, dicts):
     generators = [onmt.modules.BaseModel.Generator(opt.model_size, dicts['tgt'].size())]
 
     if 'src' in dicts and opt.get_context_emb == "" and opt.enc_pretrained_model == "transformer":
-        assert opt.dec_pretrained_model=="transformer"
         embedding_src = nn.Embedding(dicts['src'].size(),
-        opt.model_size,
-        padding_idx = onmt.Constants.SRC_PAD)
+                                     opt.model_size,
+                                     padding_idx=onmt.Constants.SRC_PAD)
     else:
         embedding_src = None
-
-
-    embedding_src = None
 
     if opt.join_embedding and embedding_src is not None:
         embedding_tgt = embedding_src
         print("* Joining the weights of encoder and decoder word embeddings")
-    else:
+    elif opt.dec_pretrained_model == "transformer":
         embedding_tgt = nn.Embedding(dicts['tgt'].size(),
                                      opt.model_size,
                                      padding_idx=onmt.Constants.TGT_PAD)
+    else:
+        print("we build a pretrained model for decoder, no embedding_tgt is needed")
 
     if opt.model == 'transformer':
         onmt.Constants.init_value = opt.param_init
@@ -136,6 +136,7 @@ def build_tm_model(opt, dicts):
             print("Building Encoder start")
             if opt.enc_pretrained_model == "transformer":
                 opt.init_embedding ='normal'
+                opt.enc_not_load_state = True
                 print("Encoder is not initialized from pretrained model")
                 encoder = TransformerEncoder(opt, embedding_src, positional_encoder, opt.encoder_type)
 
@@ -173,31 +174,28 @@ def build_tm_model(opt, dicts):
                     print("Warning: now only bert and roberta pretrained models are implemented:")
                     exit(-1)
 
+                print("----------------opt.enc_not_load_state:", opt.enc_not_load_state)
+                if opt.enc_not_load_state:
+                    print("We do not load the state from pytorch")
+                else:
+                    enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
+                    print("Loading weights from pretrained:\n",enc_state_dict_file)
+
+                    enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
+
+                    encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
+                                            model=encoder,
+                                            output_loading_info=True,
+                                            state_dict=enc_model_state_dict,
+                                            model_prefix=opt.enc_pretrained_model
+                                            )
+
             encoder.enc_pretrained_model = opt.enc_pretrained_model
 
-            print("----------------opt.enc_not_load_state:",opt.enc_not_load_state)
-            if opt.enc_not_load_state:
-                print("We do not load the state from pytorch")
-            else:
-                enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
-                print("Loading weights from pretrained:\n",enc_state_dict_file)
-
-                enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
-
-                encoder.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
-                                        model=encoder,
-                                        output_loading_info=True,
-                                        state_dict=enc_model_state_dict,
-                                        model_prefix=opt.enc_pretrained_model
-                                        )
-
-        else:
-            print("Unknown encoder type:", opt.encoder_type)
-            exit(-1)
-        
         print("\n")
         print("Building Decoder start")
         if opt.dec_pretrained_model == "transformer":
+            opt.init_embedding == 'normal'
             print("Decoder is not initialized from pretrained model")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
         else:
@@ -252,10 +250,8 @@ def build_tm_model(opt, dicts):
                                         model_prefix=opt.dec_pretrained_model
                                         )
 
-
         decoder.dec_pretrained_model = opt.dec_pretrained_model
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
-
 
     else:
         raise NotImplementedError

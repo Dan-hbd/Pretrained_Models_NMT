@@ -27,6 +27,7 @@ class Generator(nn.Module):
         
         if log_softmax:
             output = F.log_softmax(logits, dim=-1)
+            output = F.log_softmax(logits, dim=-1)
         else:
             output = logits
         return output
@@ -44,7 +45,7 @@ class NMTModel(nn.Module):
         assert self.generator is not None, "The generator needs to be created before sharing weights"
         if self.decoder.dec_pretrained_model == "transformer":  # no pretrained model for decoder
             self.generator[0].linear.weight = self.decoder.word_lut.weight
-        elif self.decoder.dec_pretrained_model == "roberta" or self.decoder.dec_pretrained_model == "bert" :
+        elif self.decoder.dec_pretrained_model == "roberta" or self.decoder.dec_pretrained_model == "bert":
             self.generator[0].linear.weight = self.decoder.embeddings.word_embeddings.weight
         else:
             print("Warning: decoder is not correctly built")

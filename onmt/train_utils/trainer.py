@@ -100,10 +100,11 @@ class XETrainer(BaseTrainer):
             opt_level = "O0" if not self.opt.fp16 else "O1"
             print("Optimization level: %s" % opt_level)
             self.model, self.optim.optimizer = amp.initialize(self.model,
-                                                                   self.optim.optimizer,
-                                                                   opt_level=opt_level,
-                                                                   keep_batchnorm_fp32=None, loss_scale="dynamic",
-                                                                   verbosity=0)
+                                                              self.optim.optimizer,
+                                                              opt_level=opt_level,
+                                                              keep_batchnorm_fp32=None, loss_scale="dynamic",
+                                                              verbosity=0)
+
             print("setup_optimizer,opt.fp16, opt_level are as following:")
             print(setup_optimizer, self.opt.fp16, opt_level)
 
@@ -160,7 +161,6 @@ class XETrainer(BaseTrainer):
         """ PyTorch semantics: save space by not creating gradients """
         with torch.no_grad():
             for i in range(len(data)):
-
                 batch = data.next()[0]
 
                 if self.cuda:
@@ -170,26 +170,13 @@ class XETrainer(BaseTrainer):
                         hidden states from decoder or
                         prob distribution from decoder generator
                 """
-                # # have a look , the first and the last sentences in this mini batch
-                # sent1_ids = targets.t()[0].cpu().numpy().tolist()
-                # sent2_ids = targets.t()[-2].cpu().numpy().tolist()
-                # tgt_dict_obj = self.dicts['tgt']
-                # tgt_id2w_dict = tgt_dict_obj.idxToLabel
-                # sent1 = [tgt_id2w_dict[num] for num in sent1_ids]
-                # sent2 = [tgt_id2w_dict[num] for num in sent2_ids]
-                # print(sent1)
-                # print(sent2)
 
                 targets = batch.get('target_output')
-                # 其实相等  torch.equal(tgt_mask, tgt_mask1): True
                 tgt_mask = targets.ne(onmt.Constants.TGT_PAD)
-
                 outputs = self.model(batch, target_masking=tgt_mask)
-
-                outputs['tgt_mask'] = tgt_mask
+                outputs['tgt_mask'] = tgt_mask  # [tgt_len, batch]
 
                 loss_dict = self.loss_function(outputs, targets, model=self.model)
-
                 loss_data = loss_dict['data']
 
                 total_loss += loss_data
@@ -384,11 +371,6 @@ class XETrainer(BaseTrainer):
                 resume=False
                 self.init_additional_data()
 
-#            del checkpoint['model']
-#            del checkpoint['optim']
-#            del checkpoint
-
-
             if opt.frozen_encoder:
                 print("encoder will be frozen")
                 #checkpoint = torch.load(opt.whole_model_statedict_file, map_location="cpu")
@@ -401,11 +383,9 @@ class XETrainer(BaseTrainer):
                     if key.startswith("encoder"):
                         print(key)
 
-
             del checkpoint['model']
             del checkpoint['optim']
             del checkpoint
-
 
         else:
             batch_order = None
@@ -414,8 +394,6 @@ class XETrainer(BaseTrainer):
             init_model_parameters(model, opt)
             resume=False
             self.init_additional_data()
-
-
 
         n_params = sum([p.nelement() for p in model.parameters()])
         print('* number of all parameters: %d' % n_params)
@@ -462,5 +440,3 @@ class XETrainer(BaseTrainer):
             self.additional_data_iteration.append(0)
             self.additional_data[i].shuffle()
             self.additional_batch_order.append(self.additional_data[i].create_order())
-
-

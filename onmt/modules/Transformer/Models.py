@@ -69,11 +69,11 @@ class TransformerEncoder(nn.Module):
             self.layers = opt.encoder_layers
         else:
             self.layers = opt.layers
-        self.enc_hidden_dropout = opt.dec_hidden_dropout
-        self.enc_attn_dropout = opt.dec_attn_dropout
-        self.enc_emb_dropout = opt.dec_emb_dropout
-        if opt.get_context_emb is None:
-            self.enc_word_dropout = opt.dec_word_dropout
+        self.enc_hidden_dropout = opt.transformer_hidden_dropout
+        self.enc_attn_dropout = opt.transformer_attn_dropout
+        self.enc_emb_dropout = opt.transformer_emb_dropout
+        if not opt.get_context_emb:
+            self.enc_word_dropout = opt.transformer_word_dropout
         self.time = opt.time
         self.version = opt.version
         self.input_type = encoder_type
@@ -108,14 +108,13 @@ class TransformerEncoder(nn.Module):
 
         self.build_modules()
 
-
     def build_modules(self):
         self.layer_modules = nn.ModuleList(
             [EncoderLayer(self.n_heads, self.model_size, self.enc_hidden_dropout, self.inner_size,
                           self.enc_attn_dropout, variational=self.varitional_dropout) for _ in
              range(self.layers)])
 
-    def forward(self, src, bert_vecs, **kwargs):
+    def forward(self, src, **kwargs):
         """
         Inputs Shapes:
             input: batch_size x len_src (wanna tranpose)
@@ -131,19 +130,9 @@ class TransformerEncoder(nn.Module):
 
             # by me
             mask_src = src.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
-
-            # before the .half(), bert_vecs is torch.cuda.FloatTensor, after : torch.cuda.HalfTensor
-            if bert_vecs is not None:
-                assert self.word_lut is None
-                if self.fp16:
-                    bert_vecs = bert_vecs.half()
-                emb = bert_vecs
-            else:
-                assert self.word_lut is not None
-                emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
+            emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
         else:
             raise NotImplementedError
-
 
         if torch_version >= 1.2:
             mask_src = mask_src.bool()
@@ -162,7 +151,6 @@ class TransformerEncoder(nn.Module):
 
             if len(self.layer_modules) - i <= onmt.Constants.checkpointing and self.training:
                 context = checkpoint(custom_layer(layer), context, mask_src)
-
             else:
                 context = layer(context, mask_src)  # batch_size x len_src x d_model
 
@@ -174,7 +162,6 @@ class TransformerEncoder(nn.Module):
 
         output_dict = {'context': context, 'src_mask': mask_src}
 
-        # return context, mask_src
         return output_dict
 
 
@@ -195,10 +182,10 @@ class TransformerDecoder(nn.Module):
         self.n_heads = opt.n_heads
         self.inner_size = opt.inner_size
         self.layers = opt.layers
-        self.dropout = opt.dec_hidden_dropout
-        self.word_dropout = opt.dec_word_dropout
-        self.attn_dropout = opt.dec_attn_dropout
-        self.emb_dropout = opt.dec_emb_dropout
+        self.dropout = opt.transformer_hidden_dropout
+        self.word_dropout = opt.transformer_word_dropout
+        self.attn_dropout = opt.transformer_attn_dropout
+        self.emb_dropout = opt.transformer_emb_dropout
         self.time = opt.time
         self.version = opt.version
         self.encoder_type = opt.encoder_type
@@ -208,7 +195,7 @@ class TransformerDecoder(nn.Module):
         self.switchout = opt.switchout
 
         if self.switchout > 0:
-            self.dec_word_dropout = 0
+            self.transformer_word_dropout = 0
 
         if opt.time == 'positional_encoding':
             self.time_transformer = positional_encoder
@@ -446,7 +433,6 @@ class Transformer(NMTModel):
             print("Warning: dec_pretrained_model is not correct")
             exit(-1)
 
-
     def reset_states(self):
         return
 
@@ -465,29 +451,29 @@ class Transformer(NMTModel):
         src = batch.get('source')  # [src_len, b]
         tgt = batch.get('target_input')  # [tgt_len, b]
         tgt_atb = batch.get('target_atb')  # a dictionary of attributes
-
         src = src.transpose(0, 1)   # transpose to have batch first [b, src_len]
 
         tgt = tgt.transpose(0, 1)   # [b, tgt_len]
-        src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
+        src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()  # [b, src_len]
 
         segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()
 
-        if  self.encoder.enc_pretrained_model == "transformer":
+        if self.encoder.enc_pretrained_model == "transformer":
             if hasattr(self, 'pretrain_emb'):
                 pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
                 embeddings = pretrain_emb_outputs[0]
-                encoder_output = self.encoder(src, embeddings)  # as src and bert_vecs, both of them are batch first
+                encoder_output = self.encoder(src, embeddings)
             else: 
                 encoder_output = self.encoder(src)
             context = encoder_output['context']
-        elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta" :
+            # [src_len, batch, d] => [batch, src_len, d]  # to make it consistent with bert
+            context = context.transpose(0, 1)
+        elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
             encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
             context = encoder_outputs[0]
         else:
             print("wrong enc_pretrained_model")
             exit(-1)
-
 
         # zero out the encoder part for pre-training
         if zero_encoder:
@@ -513,26 +499,23 @@ class Transformer(NMTModel):
                                           encoder_hidden_states=context,
                                           encoder_attention_mask=src_attention_mask)
             decoder_output = decoder_output[0]
-            decoder_output = decoder_output.transpose(0,1)
+            decoder_output = decoder_output.transpose(0, 1)  # [bsz, tgt_len, d] => [tgt_len, bsz, d]
             output = decoder_output
 
-
-
         output_dict = defaultdict(lambda: None)
-        output_dict['hidden'] = output
-        output_dict['encoder'] = context
-        output_dict['src_mask'] = src_attention_mask
-
+        output_dict['hidden'] = output  # [src_len, bsz, d]
+        output_dict['encoder'] = context  # [bsz, src_len, d]
+        output_dict['src_mask'] = src_attention_mask  # [bsz, src_len]
 
         # This step removes the padding to reduce the load for the final layer
         if target_masking is not None:
-            output = output.contiguous().view(-1, output.size(-1))
+            output = output.contiguous().view(-1, output.size(-1))  # not batch first
 
-            mask = target_masking
+            mask = target_masking  # not batch first
             """ We remove all positions with PAD """
             flattened_mask = mask.view(-1)
 
-            non_pad_indices = torch.nonzero(flattened_mask,as_tuple =False).squeeze(1)
+            non_pad_indices = torch.nonzero(flattened_mask, as_tuple=False).squeeze(1)
 
             output = output.index_select(0, non_pad_indices)
 

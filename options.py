@@ -147,14 +147,15 @@ def make_parser(parser):
     parser.add_argument('-checkpointing', type=int, default=0,
         help='Number of checkpointed layers in the Transformer')
 
-    parser.add_argument('-dec_attn_dropout', type=float, default=0.1,
-                        help='Dropout probability; applied on multi-head attention of the decoder.')
-    parser.add_argument('-dec_emb_dropout', type=float, default=0.1,
-                        help='Dropout probability; applied on top of embedding for the decoder.')
-    parser.add_argument('-dec_hidden_dropout', type=float, default=0.3,
-                        help='hidden dropout applied on decoder of the transformer.')
-    parser.add_argument('-dec_word_dropout', type=float, default=0.0,
-                        help='Dropout probability; applied on embedding indices.')
+    parser.add_argument('-transformer_attn_dropout', type=float, default=0.1,
+                        help='Dropout probability; applied on multi-head attention for encoder/decoder of transformer.')
+    parser.add_argument('-transformer_emb_dropout', type=float, default=0.1,
+                        help='Dropout probability; applied on top of embedding for encoder/decoder of transformer.')
+    parser.add_argument('-transformer_hidden_dropout', type=float, default=0.3,
+                        help='hidden dropout applied for encoder/decoder of transformer.')
+    parser.add_argument('-transformer_word_dropout', type=float, default=0.0,
+                        help='Dropout probability; applied on embedding indices for encoder/decoder of transformer.')
+
 
     parser.add_argument('-switchout', type=float, default=0.0,
                         help='Switchout algorithm')

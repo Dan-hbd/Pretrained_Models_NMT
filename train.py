@@ -224,35 +224,21 @@ def main():
             print("Warning: contextualized embeddings can be only got from bert or roberta")
             exit(-1)
 
-#    if opt.frozen_encoder:
-#        print("encoder will be frozen")
-#        #checkpoint = torch.load(opt.whole_model_statedict_file, map_location="cpu")
-#        model_state=checkpoint["model"]
-#        model.load_state_dict(model_state)
-#        for param in model.encoder.parameters():
-#            param.requires_grad = False  # 设置参数不可导
-#        print("The frozen parameters are as following " ) 
-#        for key in model_state.keys():
-#            if key.startswith("encoder"):
-#                print(key)
-
-
-
     """ Building the loss function """
     loss_function = NMTLossFunc(dicts['tgt'].size(),
                                 label_smoothing=opt.label_smoothing)
 
-#    n_params = sum([p.nelement() for p in model.parameters()])
-#    print('* number of all parameters: %d' % n_params)
-#
-#    n_params_grad = sum([p.nelement() for p in model.parameters() if p.requires_grad == True])
-#    print('* number of all parameters that need gradient: %d' % n_params_grad)
-#
-#    n_params_nograd = sum([p.nelement() for p in model.parameters() if p.requires_grad == False])
-#    print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
-#
-#    assert n_params == (n_params_grad + n_params_nograd)
-    print(model)
+    n_params = sum([p.nelement() for p in model.parameters()])
+    print('* number of all parameters: %d' % n_params)
+
+    n_params_grad = sum([p.nelement() for p in model.parameters() if p.requires_grad==True])
+    print('* number of all parameters that need gradient: %d' % n_params_grad)
+
+    n_params_nograd = sum([p.nelement() for p in model.parameters() if p.requires_grad==False])
+    print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
+
+    assert n_params == (n_params_grad + n_params_nograd)
+    # print(model)
 
     if len(opt.gpus) > 1 or opt.virtual_gpu > 1:
         raise NotImplementedError("Warning! Multi-GPU training is not fully tested and potential bugs can happen.")

@@ -393,6 +393,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin):
         """
         output_embeddings = self.get_output_embeddings()
         if output_embeddings is not None:
+            print("Tie the weights between the input embeddings and the output embeddings is done in ptetrained model")
             self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
 
     def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
@@ -767,15 +768,15 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin):
 
         if len(missing_keys) > 0:
             print("Some weights of the model were not initialized from the pretrained model")
+            # print("missing_keys:", missing_keys)
         else:
             print("All the weights of the model were initialized from the pretrained model")
 
         if len(unexpected_keys) > 0:
             print("Some weights of the pretrained model were not used")
-            print(unexpected_keys)
+            # print("unexpected_keys:", unexpected_keys)
         else:
             print("All the weights of the pretrained model checkpoint were used")
-
 
         if len(error_msgs) > 0:
             raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
@@ -791,7 +792,6 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin):
             print("missing_keys:", missing_keys)
             print("unexpected_keys:", unexpected_keys)
             print("error_msgs:", error_msgs)
-
 
         return model
 
