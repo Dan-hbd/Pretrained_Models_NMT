@@ -47,6 +47,8 @@ class NMTModel(nn.Module):
             self.generator[0].linear.weight = self.decoder.word_lut.weight
         elif self.decoder.dec_pretrained_model == "roberta" or self.decoder.dec_pretrained_model == "bert":
             self.generator[0].linear.weight = self.decoder.embeddings.word_embeddings.weight
+        elif self.decoder.dec_pretrained_model == "gpt2":
+            self.generator[0].linear.weight = self.decoder.wte.weight
         else:
             print("Warning: decoder is not correctly built")
             exit(-1)

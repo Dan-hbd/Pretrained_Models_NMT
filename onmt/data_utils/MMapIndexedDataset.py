@@ -177,6 +177,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             np_array = np_array.astype(np.int64)
 
         return torch.from_numpy(np.array(np_array))
+        #return torch.from_numpy(np_array)
 
     @property
     def sizes(self):

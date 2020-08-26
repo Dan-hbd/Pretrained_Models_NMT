@@ -425,8 +425,11 @@ class Transformer(NMTModel):
             self.model_size = self.decoder.model_size
             self.switchout = self.decoder.switchout
             self.tgt_vocab_size = self.decoder.word_lut.weight.size(0)
-        elif decoder.dec_pretrained_model == "roberta" or decoder.dec_pretrained_model == "bert": 
+        elif decoder.dec_pretrained_model == "roberta" or decoder.dec_pretrained_model == "bert":
             self.model_size = self.decoder.config.bert_hidden_size
+            self.tgt_vocab_size = self.decoder.config.vocab_size
+        elif decoder.dec_pretrained_model == "gpt2":
+            self.model_size = self.decoder.config.n_embd
             self.tgt_vocab_size = self.decoder.config.vocab_size
         else:
             print("Warning: dec_pretrained_model is not correct")
@@ -485,7 +488,7 @@ class Transformer(NMTModel):
             decoder_output = self.decoder(tgt, context, src, atbs=tgt_atb)
             output = decoder_output['hidden']
 
-        elif self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model =="roberta":
+        elif self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model == "roberta":
             # src: [b, l], src 用于做mask_src
             # context: [b, l, de_model]
             # tgt: 训练过程是tgt_input
@@ -499,6 +502,21 @@ class Transformer(NMTModel):
             decoder_output = decoder_output[0]
             decoder_output = decoder_output.transpose(0, 1)  # [bsz, tgt_len, d] => [tgt_len, bsz, d]
             output = decoder_output
+        elif self.decoder.dec_pretrained_model == "gpt2":
+            tgt_attention_mask = tgt.ne(onmt.Constants.TGT_PAD).long()  # [bsz, len]
+            decoder_output = self.decoder(input_ids=tgt,
+                                          attention_mask=tgt_attention_mask,
+                                          token_type_ids=None,
+                                          encoder_hidden_states=context,
+                                          encoder_attention_mask=src_attention_mask,
+                                          use_cache=False)
+            decoder_output = decoder_output[0]
+            decoder_output = decoder_output.transpose(0, 1)  # [bsz, tgt_len, d] => [tgt_len, bsz, d]
+            output = decoder_output
+
+        else:
+            print("Please check the dec_pretrained_model")
+            raise NotImplementedError
 
         output_dict = defaultdict(lambda: None)
         output_dict['hidden'] = output  # [src_len, bsz, d]

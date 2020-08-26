@@ -134,7 +134,6 @@ def make_parser(parser):
         help='Size of bert hidden')
 
 
-
     # Transformer Model options
     parser.add_argument('-model_size', type=int, default=512,
         help='Size of embedding / transformer hidden')      

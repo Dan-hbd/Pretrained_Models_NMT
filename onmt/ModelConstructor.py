@@ -54,8 +54,8 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'get_context_emb'):
         opt.get_context_emb = ""
 
-
-    if opt.enc_pretrained_model == 'bert':
+    # 和数据处理的方式有关，而不是和模型结构有关，除了roberta.en,其他情况用的相同的数据处理方式
+    if opt.enc_pretrained_model == 'bert' or  opt.enc_pretrained_model == 'transformer':
         onmt.Constants.SRC_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.BERT_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.BERT_BOS
@@ -65,17 +65,14 @@ def build_model(opt, dicts):
         onmt.Constants.SRC_UNK = onmt.Constants.EN_ROBERTA_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.EN_ROBERTA_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.EN_ROBERTA_EOS
-    elif opt.enc_pretrained_model == 'transformer':
-        onmt.Constants.SRC_PAD = onmt.Constants.TRANSFORMER_PAD
-        onmt.Constants.SRC_UNK = onmt.Constants.TRANSFORMER_UNK
-        onmt.Constants.SRC_BOS = onmt.Constants.TRANSFORMER_BOS
-        onmt.Constants.SRC_EOS = onmt.Constants.TRANSFORMER_EOS
+
     else:
         print("Warning: wrong enc_pretrained_model")
         exit(-1)
     
     # 不管哪种structure的decoder,处理tgt数据要么用的bert 要么roberta的字典，中文的这两个预训练模型有相同的字典
-    if opt.dec_pretrained_model == 'bert' or opt.dec_pretrained_model == 'roberta' or opt.dec_pretrained_model == 'transformer':
+    if opt.dec_pretrained_model == 'bert' or opt.dec_pretrained_model == 'roberta' or \
+            opt.dec_pretrained_model == 'transformer' or opt.dec_pretrained_model == 'gpt2':
         onmt.Constants.TGT_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.TGT_UNK = onmt.Constants.BERT_UNK
         onmt.Constants.TGT_BOS = onmt.Constants.BERT_BOS
@@ -148,13 +145,13 @@ def build_tm_model(opt, dicts):
 
                     enc_bert_config = BertConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
                     encoder = BertModel(enc_bert_config,
-                                                    bert_word_dropout=opt.enc_pretrain_word_dropout,
-                                                    bert_emb_dropout=opt.enc_pretrain_emb_dropout,
-                                                    bert_atten_dropout=opt.enc_pretrain_attn_dropout,
-                                                    bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
-                                                    bert_hidden_size=opt.enc_pretrain_hidden_size,
-                                                    is_decoder=False,
-                                               )
+                                        bert_word_dropout=opt.enc_pretrain_word_dropout,
+                                        bert_emb_dropout=opt.enc_pretrain_emb_dropout,
+                                        bert_atten_dropout=opt.enc_pretrain_attn_dropout,
+                                        bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
+                                        bert_hidden_size=opt.enc_pretrain_hidden_size,
+                                        is_decoder=False,
+                                        )
                 elif opt.enc_pretrained_model == "roberta":
                     from pretrain_module.configuration_roberta import RobertaConfig
                     from pretrain_module.modeling_roberta import RobertaModel
@@ -169,17 +166,17 @@ def build_tm_model(opt, dicts):
                                            is_decoder=False,
                                            encoder_normalize_before=opt.enc_ln_before,
                                          )
-                    print("enc_ln_beforei:",opt.enc_ln_before,)
+                    print("enc_ln_beforei:", opt.enc_ln_before)
                 else:
                     print("Warning: now only bert and roberta pretrained models are implemented:")
                     exit(-1)
 
-                print("----------------opt.enc_not_load_state:", opt.enc_not_load_state)
+                print("--------opt.enc_not_load_state--------:", opt.enc_not_load_state)
                 if opt.enc_not_load_state:
                     print("We do not load the state from pytorch")
                 else:
-                    enc_state_dict_file=opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
-                    print("Loading weights from pretrained:\n",enc_state_dict_file)
+                    enc_state_dict_file = opt.enc_pretrained_config_dir + "/" + opt.enc_state_dict
+                    print("Loading weights from pretrained:\n", enc_state_dict_file)
 
                     enc_model_state_dict = torch.load(enc_state_dict_file, map_location="cpu")
 
@@ -220,13 +217,21 @@ def build_tm_model(opt, dicts):
 
                 dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
                 decoder = RobertaModel(dec_roberta_config,
-                                        bert_word_dropout=opt.dec_pretrain_word_dropout,
-                                        bert_emb_dropout=opt.dec_pretrain_emb_dropout,
-                                        bert_atten_dropout=opt.dec_pretrain_attn_dropout,
-                                        bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
-                                        bert_hidden_size=opt.dec_pretrain_hidden_size,
-                                        is_decoder=True,
-                                     )
+                                       bert_word_dropout=opt.dec_pretrain_word_dropout,
+                                       bert_emb_dropout=opt.dec_pretrain_emb_dropout,
+                                       bert_atten_dropout=opt.dec_pretrain_attn_dropout,
+                                       bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
+                                       bert_hidden_size=opt.dec_pretrain_hidden_size,
+                                       is_decoder=True,
+                                       )
+            elif opt.dec_pretrained_model == "gpt2":
+                from pretrain_module.configuration_gpt2 import GPT2Config
+                from pretrain_module.modeling_gpt2 import GPT2Model
+                print("Building GPT2 for the decoder")
+                gpt2_config = GPT2Config.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
+                gpt2_config.add_cross_attention = True
+                decoder = GPT2Model(gpt2_config)
+
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
                 exit(-1)
@@ -235,9 +240,9 @@ def build_tm_model(opt, dicts):
                 print("We don't load the state for pretrained model of decoder from pytorch")
 
             else:
-                dec_state_dict_file=opt.dec_pretrained_config_dir + "/" + opt.dec_state_dict
-                print("After builing pretrained model we load the state from:\n",dec_state_dict_file)
-                print("The pretrained model is:",opt.dec_pretrained_model)
+                dec_state_dict_file = opt.dec_pretrained_config_dir + "/" + opt.dec_state_dict
+                print("After builing pretrained model we load the state from:\n", dec_state_dict_file)
+                print("The pretrained model is:", opt.dec_pretrained_model)
 
                 dec_model_state_dict = torch.load(dec_state_dict_file, map_location="cpu")
 
@@ -260,7 +265,6 @@ def build_tm_model(opt, dicts):
 
     for g in model.generator:
         init.xavier_uniform_(g.linear.weight)
-
 
     if opt.dec_pretrained_model != "transformer" or opt.enc_pretrained_model != "transformer":
         opt.init_embedding =""

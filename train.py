@@ -4,7 +4,8 @@ import onmt.Markdown
 import onmt.modules
 import argparse
 import torch
-import time, datetime
+import time
+import datetime
 from onmt.train_utils.trainer import XETrainer
 from onmt.modules.Loss import NMTLossFunc, NMTAndCTCLossFunc
 from onmt.ModelConstructor import build_model
@@ -49,7 +50,7 @@ def main():
             dataset = torch.load(opt.data + ".train.pt")
 
         elapse = str(datetime.timedelta(seconds=int(time.time() - start)))
-        print("Done after %s" % elapse )
+        print("Done after %s" % elapse)
 
         # For backward compatibility
         train_dict = defaultdict(lambda: None, dataset['train'])
@@ -193,7 +194,7 @@ def main():
 
     model = build_model(opt, dicts)
 
-    if opt.get_context_emb is not "":
+    if opt.get_context_emb:
         assert opt.enc_pretrained_model == "transformer"
         assert opt.dec_pretrained_model == "transformer"
         print("We use pretrained model to get contextualized embeddings and feed them to the original transformer")
@@ -203,22 +204,22 @@ def main():
             from pretrain_module.modeling_bert import BertModel
             emb_pretrain_config = BertConfig.from_json_file(opt.emb_pretrained_config_dir + "/" + opt.emb_config_name)
             pretrain_emb = BertModel(emb_pretrain_config,
-                                bert_word_dropout=opt.emb_pretrain_word_dropout,
-                                bert_emb_dropout=opt.emb_pretrain_emb_dropout,
-                                bert_atten_dropout=opt.emb_pretrain_attn_dropout,
-                                bert_hidden_dropout=opt.emb_pretrain_hidden_dropout,
-                                bert_hidden_size=opt.emb_pretrain_hidden_size,
-                                is_decoder=False,
-                                )
+                                     bert_word_dropout=opt.emb_pretrain_word_dropout,
+                                     bert_emb_dropout=opt.emb_pretrain_emb_dropout,
+                                     bert_atten_dropout=opt.emb_pretrain_attn_dropout,
+                                     bert_hidden_dropout=opt.emb_pretrain_hidden_dropout,
+                                     bert_hidden_size=opt.emb_pretrain_hidden_size,
+                                     is_decoder=False,
+                                     )
             emb_state_dict_file = opt.emb_pretrained_config_dir + "/" + opt.emb_pretrained_state_dict
             emb_model_state_dict = torch.load(emb_state_dict_file, map_location="cpu")
             print("After builing pretrained model we load the state from:\n", emb_state_dict_file)
             pretrain_emb.from_pretrained(pretrained_model_name_or_path=opt.enc_pretrained_config_dir,
-                                    model=pretrain_emb,
-                                    output_loading_info=True,
-                                    state_dict=emb_model_state_dict,
-                                    model_prefix=opt.get_context_emb
-                                    )
+                                         model=pretrain_emb,
+                                         output_loading_info=True,
+                                         state_dict=emb_model_state_dict,
+                                         model_prefix=opt.get_context_emb
+                                         )
             model.add_module("pretrain_emb", pretrain_emb)
         else:
             print("Warning: contextualized embeddings can be only got from bert or roberta")
@@ -238,7 +239,7 @@ def main():
     print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
 
     assert n_params == (n_params_grad + n_params_nograd)
-    # print(model)
+    print(model)
 
     if len(opt.gpus) > 1 or opt.virtual_gpu > 1:
         raise NotImplementedError("Warning! Multi-GPU training is not fully tested and potential bugs can happen.")
