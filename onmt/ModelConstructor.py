@@ -133,9 +133,9 @@ def build_tm_model(opt, dicts):
         onmt.Constants.init_value = opt.param_init
 
         if opt.encoder_type == "text":
+            print("\n")
             print("Building Encoder start")
             if opt.enc_pretrained_model == "transformer":
-                opt.init_embedding ='normal'
                 opt.enc_not_load_state = True
                 print("Encoder is not initialized from pretrained model")
                 encoder = TransformerEncoder(opt, embedding_src, positional_encoder, opt.encoder_type)
@@ -192,10 +192,8 @@ def build_tm_model(opt, dicts):
 
             encoder.enc_pretrained_model = opt.enc_pretrained_model
 
-        print("\n")
         print("Building Decoder start")
         if opt.dec_pretrained_model == "transformer":
-            opt.init_embedding == 'normal'
             print("Decoder is not initialized from pretrained model")
             decoder = TransformerDecoder(opt, embedding_tgt, positional_encoder, attribute_embeddings=None)
         else:
@@ -263,16 +261,20 @@ def build_tm_model(opt, dicts):
     for g in model.generator:
         init.xavier_uniform_(g.linear.weight)
 
+
+    if opt.dec_pretrained_model != "transformer" or opt.enc_pretrained_model != "transformer":
+        opt.init_embedding =""
+
     if opt.init_embedding == 'xavier':
-        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
+        if model.encoder.word_lut is not None:
             init.xavier_uniform_(model.encoder.word_lut.weight)
-        if model.decoder.dec_pretrained_model == "transformer" and model.decoder.word_lut is not None:
+        if model.decoder.word_lut is not None:
             init.xavier_uniform_(model.decoder.word_lut.weight)
 
     elif opt.init_embedding == 'normal':
-        if model.encoder.enc_pretrained_model == "transformer" and model.encoder.word_lut is not None:
+        if model.encoder.word_lut is not None:
             init.normal_(model.encoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
-        if model.decoder.dec_pretrained_model == "transformer" and model.decoder.word_lut is not None:
+        if model.decoder.word_lut is not None:
             init.normal_(model.decoder.word_lut.weight, mean=0, std=opt.model_size ** -0.5)
 
     return model

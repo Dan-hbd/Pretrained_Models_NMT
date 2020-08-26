@@ -127,7 +127,6 @@ class TransformerEncoder(nn.Module):
 
         """ Embedding: batch_size x len_src x d_model """
         if self.input_type == "text":
-
             # by me
             mask_src = src.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
             emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
@@ -452,7 +451,6 @@ class Transformer(NMTModel):
         tgt = batch.get('target_input')  # [tgt_len, b]
         tgt_atb = batch.get('target_atb')  # a dictionary of attributes
         src = src.transpose(0, 1)   # transpose to have batch first [b, src_len]
-
         tgt = tgt.transpose(0, 1)   # [b, tgt_len]
         src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()  # [b, src_len]
 
@@ -623,24 +621,22 @@ class Transformer(NMTModel):
         :param beam_size: Size of beam used in beam search
         :return:
         """
-        src = batch.get('source') # [src_len, bsz]
+        src = batch.get('source')  # [src_len, bsz]
         tgt_atb = batch.get('target_atb')
         src_transposed = src.transpose(0, 1)  # make batch_size first (batch_size, src_len)
         segments_tensor = src_transposed.ne(onmt.Constants.SRC_PAD).long()
         src_attention_mask = src_transposed.ne(onmt.Constants.SRC_PAD).long()  #[batch_size, src_len]
 
         # by me
-
-        if  self.encoder.enc_pretrained_model == "transformer":
-            print("The code here needs to be checked")
-            exit(-1)
-            # if hasattr(self, 'pretrain_emb'):
-            #     pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
-            #     embeddings = pretrain_emb_outputs[0]
-            #     encoder_output = self.encoder(src, embeddings)  # as src and bert_vecs, both of them are batch first
-            # else:
-            #     encoder_output = self.encoder(src)
-            # context = encoder_output['context']
+        if self.encoder.enc_pretrained_model == "transformer":
+            if hasattr(self, 'pretrain_emb'):
+                pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
+                embeddings = pretrain_emb_outputs[0]
+                encoder_output = self.encoder(src_transposed, embeddings)
+            else:
+                encoder_output = self.encoder(src_transposed)
+            #  [batch, src_len, d]  we need context not batch first
+            context = encoder_output['context']
         elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
             encoder_outputs = self.encoder(src_transposed, segments_tensor, src_attention_mask) # the encoder is a pretrained model
             context = encoder_outputs[0]  # [batch_size , len, hidden]
@@ -649,8 +645,7 @@ class Transformer(NMTModel):
         # src_transposed: batch first
         # [batch_size , len] => [batchsize, 1, len] 非padding位置True
         # src: time first
-        mask_src = src_transposed.ne(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
-        dec_pretrained_model=self.decoder.dec_pretrained_model
+        dec_pretrained_model = self.decoder.dec_pretrained_model
         if dec_pretrained_model == "transformer":
             mask_src = src_transposed.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
         elif dec_pretrained_model == "bert" or dec_pretrained_model == "roberta":
@@ -660,7 +655,8 @@ class Transformer(NMTModel):
             raise NotImplementedError
 
         decoder_state = TransformerDecodingState(src, tgt_atb, context, mask_src,
-                                             beam_size=beam_size, model_size=self.model_size, type=type, dec_pretrained_model=dec_pretrained_model)
+                                                 beam_size=beam_size, model_size=self.model_size,
+                                                 type=type, dec_pretrained_model=dec_pretrained_model)
 
         return decoder_state  
 
