@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
-
+import torch.nn.functional as F
 from .activations import ACT2FN
 from .configuration_gpt2 import GPT2Config
 from .file_utils import (
@@ -138,8 +138,10 @@ class Attention(nn.Module):
         else:
             self.c_attn = Conv1D(3 * n_state, nx)
         self.c_proj = Conv1D(n_state, nx)
-        self.attn_dropout = nn.Dropout(config.attn_pdrop)
-        self.resid_dropout = nn.Dropout(config.resid_pdrop)
+        self.attn_dropout = nn.Dropout(config.gpt2_atten_dropout)
+        self.resid_dropout = nn.Dropout(config.gpt2_resid_dropout)
+        print("config.gpt2_atten_dropout:", config.gpt2_atten_dropout)
+        print("config.gpt2_resid_dropout:", config.gpt2_resid_dropout)
         self.pruned_heads = set()
 
     def prune_heads(self, heads):
@@ -464,12 +466,36 @@ GPT2_INPUTS_DOCSTRING = r"""
     GPT2_START_DOCSTRING,
 )
 class GPT2Model(GPT2PreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config,
+                 gpt2_word_dropout=None,
+                 gpt2_emb_dropout=None,
+                 gpt2_atten_dropout=None,
+                 gpt2_resid_dropout=None,
+                 gpt2_hidden_size=None,
+                 add_cross_attention=False,
+                 ):
         super().__init__(config)
+
+        if gpt2_word_dropout is not None:
+            config.gpt2_word_dropout = gpt2_word_dropout
+        if gpt2_emb_dropout is not None:
+            config.gpt2_emb_dropout = gpt2_emb_dropout
+        if gpt2_atten_dropout is not None:
+            config.gpt2_atten_dropout = gpt2_atten_dropout
+        if gpt2_resid_dropout is not None:
+            config.gpt2_resid_dropout = gpt2_resid_dropout
+
+        if gpt2_hidden_size is not None:
+            config.n_embd = gpt2_hidden_size
+        if add_cross_attention is not None:
+            config.add_cross_attention = add_cross_attention
 
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
         self.wpe = nn.Embedding(config.n_positions, config.n_embd)
-        self.drop = nn.Dropout(config.embd_pdrop)
+        self.drop = nn.Dropout(config.gpt2_emb_dropout)
+        self.gpt2_word_dropout =config.gpt2_word_dropout
+        print("config.gpt2_emb_dropout:", config.gpt2_emb_dropout)
+        print("config.gpt2_word_dropout:", config.gpt2_word_dropout)
         self.h = nn.ModuleList([Block(config.n_ctx, config, scale=True) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
@@ -591,7 +617,18 @@ class GPT2Model(GPT2PreTrainedModel):
         head_mask = self.get_head_mask(head_mask, self.config.n_layer)
 
         if inputs_embeds is None:
-            inputs_embeds = self.wte(input_ids)
+            embed = self.wte
+            if self.gpt2_word_dropout and self.training:
+                mask = embed.weight.data.new().resize_((embed.weight.size(0), 1)).bernoulli_(1 - self.gpt2_word_dropout).\
+                           expand_as(embed.weight) / (1 - self.gpt2_word_dropout)
+                masked_embed_weight = mask * embed.weight
+            else:
+                masked_embed_weight = embed.weight
+                padding_idx = embed.padding_idx
+
+            inputs_embeds = F.embedding(input_ids, masked_embed_weight, padding_idx, embed.max_norm, embed.norm_type,
+                                        embed.scale_grad_by_freq, embed.sparse)
+
         position_embeds = self.wpe(position_ids)
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)

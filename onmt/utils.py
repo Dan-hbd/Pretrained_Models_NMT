@@ -1,7 +1,7 @@
 import logging, traceback
 import os, re
 import torch
-
+from collections import OrderedDict
 
 # this function is borrowed from Facebook
 # avoid jumping into the middle of a character
@@ -65,3 +65,16 @@ def flip(x, dim):
              else x.new(torch.arange(x.size(i)-1, -1, -1).tolist()).long()
              for i in range(x.dim()))
     return x[inds]
+
+
+def change_paranames(checkpoint):
+    old_state_dict = checkpoint["model"]
+    new_state_dict = OrderedDict()
+
+    for old_key, value in old_state_dict.items():
+        if old_key.startswith("encoder."):
+            new_key = old_key.strip("encoder.")
+            new_state_dict[new_key] = value
+
+    return new_state_dict
+

@@ -3,7 +3,7 @@ import torch.nn as nn
 import onmt
 from onmt.modules.Transformer.Models import TransformerEncoder, TransformerDecoder, Transformer
 from onmt.modules.Transformer.Layers import PositionalEncoding
-
+from onmt.utils import change_paranames
 init = torch.nn.init
 
 MAX_LEN = onmt.Constants.max_position_length  # This should be the longest sentence from the dataset
@@ -55,7 +55,7 @@ def build_model(opt, dicts):
         opt.get_context_emb = ""
 
     # 和数据处理的方式有关，而不是和模型结构有关，除了roberta.en,其他情况用的相同的数据处理方式
-    if opt.enc_pretrained_model == 'bert' or  opt.enc_pretrained_model == 'transformer':
+    if opt.enc_pretrained_model == 'bert' or opt.enc_pretrained_model == 'transformer':
         onmt.Constants.SRC_PAD = onmt.Constants.BERT_PAD
         onmt.Constants.SRC_UNK = onmt.Constants.BERT_UNK
         onmt.Constants.SRC_BOS = onmt.Constants.BERT_BOS
@@ -229,8 +229,14 @@ def build_tm_model(opt, dicts):
                 from pretrain_module.modeling_gpt2 import GPT2Model
                 print("Building GPT2 for the decoder")
                 gpt2_config = GPT2Config.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
-                gpt2_config.add_cross_attention = True
-                decoder = GPT2Model(gpt2_config)
+                decoder = GPT2Model(gpt2_config,
+                                    gpt2_word_dropout=opt.dec_pretrain_word_dropout,
+                                    gpt2_emb_dropout=opt.dec_pretrain_emb_dropout,
+                                    gpt2_atten_dropout=opt.dec_pretrain_attn_dropout,
+                                    gpt2_resid_dropout=opt.dec_pretrain_hidden_dropout,
+                                    gpt2_hidden_size=opt.dec_pretrain_hidden_size,
+                                    add_cross_attention=True
+                                    )
 
             else:
                 print("Warning: now only bert and roberta pretrained models are implemented:")
@@ -245,6 +251,8 @@ def build_tm_model(opt, dicts):
                 print("The pretrained model is:", opt.dec_pretrained_model)
 
                 dec_model_state_dict = torch.load(dec_state_dict_file, map_location="cpu")
+                if opt.dec_pretrained_model == "gpt2":
+                    dec_model_state_dict = change_paranames(dec_model_state_dict)
 
                 decoder.from_pretrained(pretrained_model_name_or_path=opt.dec_pretrained_config_dir,
                                         model=decoder,

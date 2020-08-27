@@ -57,6 +57,7 @@ class RobertaEmbeddings(nn.Module):
         )
         self.max_position_id=config.max_position_embeddings
         self.bert_word_dropout = config.bert_word_dropout
+        print("worddropout for roberta:", self.bert_word_dropout)
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
         position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
