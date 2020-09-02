@@ -271,8 +271,11 @@ def build_tm_model(opt, dicts):
         print("Joining the weights of decoder input and output embeddings")
         model.tie_weights()
 
-    for g in model.generator:
-        init.xavier_uniform_(g.linear.weight)
+    if opt.dec_pretrained_model == "transformer":
+        print("the decoder is from transformer, not initialzed from pretrained model, "
+              "then the tgt_embeding and generator linear module are xavier initialized ")
+        for g in model.generator:
+            init.xavier_uniform_(g.linear.weight)
 
     if opt.dec_pretrained_model != "transformer" or opt.enc_pretrained_model != "transformer":
         opt.init_embedding =""
