@@ -157,6 +157,7 @@ class XETrainer(BaseTrainer):
         total_words = 0
         batch_order = data.create_order(random=False)
         self.model.eval()
+        self.loss_function.eval()
         self.model.reset_states()
         """ PyTorch semantics: save space by not creating gradients """
         with torch.no_grad():
@@ -173,7 +174,7 @@ class XETrainer(BaseTrainer):
 
                 targets = batch.get('target_output')
                 tgt_mask = targets.ne(onmt.Constants.TGT_PAD)
-                outputs = self.model(batch, target_masking=tgt_mask)
+                outputs = self.model(batch, target_mask=tgt_mask)
                 outputs['tgt_mask'] = tgt_mask  # [tgt_len, batch]
 
                 loss_dict = self.loss_function(outputs, targets, model=self.model)
@@ -183,12 +184,15 @@ class XETrainer(BaseTrainer):
                 total_words += batch.tgt_size
 
         self.model.train()
+        self.loss_function.train()
         return total_loss / total_words
         
     def train_epoch(self, epoch, resume=False, batch_order=None, iteration=0):
         
         opt = self.opt
         train_data = self.train_data
+        self.model.train()
+        self.loss_function.train()
         
         # Clear the gradients of the model
         # self.runner.zero_grad()
@@ -245,7 +249,7 @@ class XETrainer(BaseTrainer):
                     targets = batch.get('target_output')
                     tgt_mask = targets.data.ne(onmt.Constants.TGT_PAD)
 
-                    outputs = self.model(batch, target_masking=tgt_mask)
+                    outputs = self.model(batch, target_mask=tgt_mask)
 
                     batch_size = batch.size
 
@@ -358,7 +362,7 @@ class XETrainer(BaseTrainer):
                     iteration = 0
                 opt.start_epoch = int(math.floor(float(checkpoint['epoch'] + 1)))
 
-                resume=True
+                resume = True
                 if len(self.additional_data) > 0:
                     if 'additional_batch_order' in checkpoint:
                         self.additional_batch_order = checkpoint['additional_batch_order']
@@ -368,20 +372,8 @@ class XETrainer(BaseTrainer):
             else:
                 batch_order = None
                 iteration = 0
-                resume=False
+                resume = False
                 self.init_additional_data()
-
-            if opt.frozen_encoder:
-                print("encoder will be frozen")
-                #checkpoint = torch.load(opt.whole_model_statedict_file, map_location="cpu")
-                model_state=checkpoint["model"]
-                #model.load_state_dict(model_state)
-                for param in self.model.encoder.parameters():
-                    param.requires_grad = False  # 设置参数不可导
-                print("The frozen parameters are as following " ) 
-                for key in model_state.keys():
-                    if key.startswith("encoder"):
-                        print(key)
 
             del checkpoint['model']
             del checkpoint['optim']
@@ -394,17 +386,6 @@ class XETrainer(BaseTrainer):
             init_model_parameters(model, opt)
             resume=False
             self.init_additional_data()
-
-        n_params = sum([p.nelement() for p in model.parameters()])
-        print('* number of all parameters: %d' % n_params)
-
-        n_params_grad = sum([p.nelement() for p in model.parameters() if p.requires_grad == True])
-        print('* number of all parameters that need gradient: %d' % n_params_grad)
-
-        n_params_nograd = sum([p.nelement() for p in model.parameters() if p.requires_grad == False])
-        print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
-
-        assert n_params == (n_params_grad + n_params_nograd)
 
 
         valid_loss = self.eval(self.valid_data)

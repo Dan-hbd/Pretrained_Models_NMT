@@ -226,8 +226,11 @@ def main():
             exit(-1)
 
     """ Building the loss function """
-    loss_function = NMTLossFunc(dicts['tgt'].size(),
-                                label_smoothing=opt.label_smoothing)
+
+    loss_function = NMTLossFunc(opt.model_size, dicts['tgt'].size(),
+                            label_smoothing=opt.label_smoothing,
+                            mirror=opt.mirror_loss,
+                            fast_xentropy=opt.fast_xentropy)
 
     n_params = sum([p.nelement() for p in model.parameters()])
     print('* number of all parameters: %d' % n_params)

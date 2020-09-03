@@ -438,7 +438,7 @@ class Transformer(NMTModel):
     def reset_states(self):
         return
 
-    def forward(self, batch, target_masking=None, zero_encoder=False):
+    def forward(self, batch, target_mask=None, zero_encoder=False):
         """
         Inputs Shapes:
             src: len_src x batch_size
@@ -518,26 +518,28 @@ class Transformer(NMTModel):
             print("Please check the dec_pretrained_model")
             raise NotImplementedError
 
+
         output_dict = defaultdict(lambda: None)
         output_dict['hidden'] = output  # [src_len, bsz, d]
         output_dict['encoder'] = context  # [bsz, src_len, d]
         output_dict['src_mask'] = src_attention_mask  # [bsz, src_len]
+        output_dict['target_mask'] = target_mask
+
 
         # This step removes the padding to reduce the load for the final layer
-        if target_masking is not None:
-            output = output.contiguous().view(-1, output.size(-1))  # not batch first
-
-            mask = target_masking  # not batch first
-            """ We remove all positions with PAD """
-            flattened_mask = mask.view(-1)
-
-            non_pad_indices = torch.nonzero(flattened_mask, as_tuple=False).squeeze(1)
-
-            output = output.index_select(0, non_pad_indices)
+#        if target_masking is not None:
+#            output = output.contiguous().view(-1, output.size(-1))  # not batch first
+#
+#            mask = target_masking  # not batch first
+#            """ We remove all positions with PAD """
+#            flattened_mask = mask.view(-1)
+#
+#            non_pad_indices = torch.nonzero(flattened_mask, as_tuple=False).squeeze(1)
+#
+#            output = output.index_select(0, non_pad_indices)
 
         # final layer: computing softmax
-        logprobs = self.generator[0](output)
-
+        logprobs = self.generator[0](output, log_softmax=False)
         output_dict['logprobs'] = logprobs
 
         return output_dict

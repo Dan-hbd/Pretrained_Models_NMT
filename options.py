@@ -43,6 +43,17 @@ def make_parser(parser):
                         help="""Merge action for the bidirectional hidden states:
                         [concat|sum]""")
 
+    parser.add_argument('-verbose', action='store_true',
+                        help='Show more information about training (for Nerds)')
+
+    # MODEL CONFIG
+    parser.add_argument('-mirror_loss', action='store_true',
+                        help='Using mirror loss')
+
+    # FAST IMPLEMENTATION
+    parser.add_argument('-fast_xentropy', action="store_true",
+                        help="""Fast cross entropy loss""")
+
     # options of embedding module
     parser.add_argument('-get_context_emb', default="", type=str,
                         help='get contextualized embeddings for tokens before feed them to the transformer')
@@ -70,9 +81,6 @@ def make_parser(parser):
         help='Size of the hidden of the embedding module')
 
 
-
-    parser.add_argument('-frozen_encoder', action='store_true',
-                        help='encoder is frozen, parameters of encoder is not trainable')
 
 #    parser.add_argument('-whole_model_statedict_file', default="", type=str,
 #                        help="""""")
