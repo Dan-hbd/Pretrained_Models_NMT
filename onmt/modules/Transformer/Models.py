@@ -520,7 +520,7 @@ class Transformer(NMTModel):
 
 
         output_dict = defaultdict(lambda: None)
-        output_dict['hidden'] = output  # [src_len, bsz, d]
+        output_dict['hidden'] = output  # [tgt_len, bsz, d]
         output_dict['encoder'] = context  # [bsz, src_len, d]
         output_dict['src_mask'] = src_attention_mask  # [bsz, src_len]
         output_dict['target_mask'] = target_mask
