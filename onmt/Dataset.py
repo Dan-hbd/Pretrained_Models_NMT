@@ -71,7 +71,7 @@ class Batch(object):
             #src_lengths 是一个list
             batch_size = len(self.src_lengths)
             self.src_size = sum(self.src_lengths) - batch_size   # 这个batch中 一共有多少个token
-            self.tensors['source_noCLS'] = self.tensors['source'][1:]
+            #self.tensors['source_noCLS'] = self.tensors['source'][1:]
 
         else:
             self.src_size = 0
