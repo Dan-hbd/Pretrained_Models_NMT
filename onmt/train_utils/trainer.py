@@ -119,7 +119,7 @@ class XETrainer(BaseTrainer):
     def save(self, epoch, valid_ppl, batch_order=None, iteration=-1):
         
         opt = self.opt
-        model = self.model
+        # model = self.model
         dicts = self.dicts
 
         model_state_dict = self.model.state_dict()
