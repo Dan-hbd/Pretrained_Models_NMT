@@ -1,28 +1,25 @@
 import sys
-sys.path.append('/home/dhe/hiwi/Exercises/Init_encoder_with_Roberta/')
-sys.path.append('/home/dhe/hiwi/Exercises/Init_encoder_with_Roberta/roberta_module/')
-
-
+sys.path.append('/home/dhe/hiwi/Exercises/Pretrained_Models_NMT/')
 
 import onmt.Markdown
 
 import argparse
-from roberta_module.roberta_tokenization_ch import FullTokenizer
+from pretrain_module.roberta_tokenization_ch import FullTokenizer
 from transformers import RobertaTokenizer
 
 parser = argparse.ArgumentParser(description='preprocess.py')
 onmt.Markdown.add_md_help_argument(parser)
 
-parser.add_argument('-src_data', default= "",
+parser.add_argument('-src_data', default="",
                     help="Path to the source data")
-parser.add_argument('-tgt_data', default= "",
+parser.add_argument('-tgt_data', default="",
                     help="Path to the target data")
 
 opt = parser.parse_args()
 
 
 
-vocab_file="/project/student_projects2/dhe/BERT/experiments/pytorch_roberta_model/roberta-base-layer12-zh/vocab.txt"
+vocab_file="/project/student_projects2/dhe/BERT/experiments/pytorch_pretrained_models/roberta-base-layer12-zh/bert-base-chinese-vocab.txt"
 
 def tokenize_data(raw_data, tokenizer, lang):
     with open(raw_data, "r", encoding="utf-8") as f_raw:

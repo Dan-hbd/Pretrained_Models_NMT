@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/dhe/hiwi/Exercises/Init_encoder_with_Roberta/')
+sys.path.append('/home/dhe/hiwi/Exercises/Pretrained_Models_NMT/')
 import onmt.Markdown
 import argparse
 
