@@ -114,7 +114,7 @@ class TransformerEncoder(nn.Module):
                           self.enc_attn_dropout, variational=self.varitional_dropout) for _ in
              range(self.layers)])
 
-    def forward(self, src, **kwargs):
+    def forward(self, src, contextul_emb=None, **kwargs):
         """
         Inputs Shapes:
             input: batch_size x len_src (wanna tranpose)
@@ -129,7 +129,10 @@ class TransformerEncoder(nn.Module):
         if self.input_type == "text":
             # by me
             mask_src = src.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
-            emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
+            if contextul_emb is not None:
+                emb = contextul_emb
+            else:
+                emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
         else:
             raise NotImplementedError
 
@@ -564,10 +567,17 @@ class Transformer(NMTModel):
         src_attention_mask = src.ne(onmt.Constants.SRC_PAD).long()   #[b, src_len]
         segments_tensor = src.ne(onmt.Constants.SRC_PAD).long()  #[b, src_len]
 
-        if self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta" :
-            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
+        if self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
+            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask)  # the encoder is a pretrained model
             # 在encoder里我们用 src 制作 src_mask，src保持和以前的代码不变
             context = encoder_outputs[0]
+        elif self.encoder.enc_pretrained_model == "transformer" and hasattr(self, 'pretrain_emb'):
+            pretrain_emb_outputs = self.pretrain_emb(src, segments_tensor, src_attention_mask)
+            embeddings = pretrain_emb_outputs[0]
+            encoder_output = self.encoder(src, embeddings)
+            context = encoder_output['context']
+            # [src_len, batch, d] => [batch, src_len, d]  # to make it consistent with bert
+            context = context.transpose(0, 1)
         else:
             print("wrong enc_pretrained_model")
             exit(-1)
@@ -616,7 +626,7 @@ class Transformer(NMTModel):
         :return: a dictionary containing: log-prob output and the attention coverage
         """
 
-        hidden,_ = self.decoder.step(tgt_inputs, decoder_state)
+        hidden, _ = self.decoder.step(tgt_inputs, decoder_state)
 
         # make time first
         if self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model == "roberta":
