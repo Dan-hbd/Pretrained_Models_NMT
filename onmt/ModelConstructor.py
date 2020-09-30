@@ -151,6 +151,7 @@ def build_tm_model(opt, dicts):
                                         bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
                                         bert_hidden_size=opt.enc_pretrain_hidden_size,
                                         is_decoder=False,
+                                        gradient_checkpointing=opt.enc_gradient_checkpointing,
                                         )
                 elif opt.enc_pretrained_model == "roberta":
                     from pretrain_module.configuration_roberta import RobertaConfig

@@ -127,8 +127,9 @@ def make_parser(parser):
     parser.add_argument('-enc_pretrain_hidden_dropout', type=float, default=0.1,
                         help="""dropout applied on bert hidden, corresponds to hidden_dropout_prob""")
     parser.add_argument('-enc_pretrain_hidden_size', type=int, default=768,
-        help='Size of bert hidden')
-
+                        help='Size of bert hidden')
+    parser.add_argument('-enc_gradient_checkpointing', action='store_true',
+                        help='use gradient checkpointing to save memory at the expense of slower backward pass')
 
     parser.add_argument('-dec_pretrain_word_dropout', type=float, default=0.0,
                         help="""word dropout appled on bert""")
@@ -139,7 +140,7 @@ def make_parser(parser):
     parser.add_argument('-dec_pretrain_hidden_dropout', type=float, default=0.1,
                         help="""dropout applied on bert hidden, corresponds to hidden_dropout_prob""")
     parser.add_argument('-dec_pretrain_hidden_size', type=int, default=768,
-        help='Size of bert hidden')
+                        help='Size of bert hidden')
 
 
     # Transformer Model options

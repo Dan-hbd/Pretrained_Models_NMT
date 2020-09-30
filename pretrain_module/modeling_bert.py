@@ -178,6 +178,8 @@ except ImportError:
     import torch.nn.LayerNorm as BertLayerNorm
 
 
+#BertLayerNorm = torch.nn.LayerNorm
+
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
     """
@@ -207,6 +209,9 @@ class BertEmbeddings(nn.Module):
             token_type_ids = torch.zeros_like(input_ids)
         # by me
         embed = self.word_embeddings
+
+        # print(embed.weight[onmt.Constants.BERT_MASK, :])
+
         if self.bert_word_dropout and self.training:
             mask = embed.weight.data.new().resize_((embed.weight.size(0), 1)).bernoulli_(1 - self.bert_word_dropout).\
                        expand_as(embed.weight) / (1 - self.bert_word_dropout)
@@ -493,7 +498,6 @@ class BertAttention(nn.Module):
         return outputs, buffer
 
 
-
 class BertIntermediate(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -565,7 +569,6 @@ class BertLayer(nn.Module):
         outputs = (layer_output,) + outputs
         return outputs
 
-
     def bertlayer_step(
             self,
             hidden_states,
@@ -586,8 +589,7 @@ class BertLayer(nn.Module):
         attention_output = self_attention_outputs[0] # context_layer
         outputs = self_attention_outputs[1:]  # (attention_probs,)add self attentions if we output attention weights
 
-
-        cross_attention_outputs,buffer = self.crossattention.attn_step(
+        cross_attention_outputs, buffer = self.crossattention.attn_step(
             attention_output,
             attention_mask,
             head_mask,
@@ -601,7 +603,7 @@ class BertLayer(nn.Module):
         intermediate_output = self.intermediate(attention_output)
         # 1.dropout(intermediate_output) 2. add(attention_output) 3.LN
         layer_output = self.output(intermediate_output, attention_output)
-        outputs = (layer_output,) + outputs # 单纯的encoder的时候， outputs是空tuple(), outputs 表示attention
+        outputs = (layer_output,) + outputs  # 单纯的encoder的时候， outputs是空tuple(), outputs 表示attention
         return outputs, buffer
 
 
@@ -628,7 +630,8 @@ class BertEncoder(nn.Module):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if getattr(self.config, "gradient_checkpointing", False):
+            # 默认返回值， 如果config 没有这个属性，默认返回值
+            if getattr(self.config, "gradient_checkpointing", False) and self.training:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
@@ -886,7 +889,8 @@ class BertModel(BertPreTrainedModel):
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
                  is_decoder=False,
-                 encoder_normalize_before=False
+                 encoder_normalize_before=False,
+                 gradient_checkpointing=False
                  ):
 
         super().__init__(config)
@@ -904,6 +908,7 @@ class BertModel(BertPreTrainedModel):
 
         self.config.is_decoder = is_decoder
         self.config.encoder_normalize_before = encoder_normalize_before
+        self.config.gradient_checkpointing = gradient_checkpointing
 
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
