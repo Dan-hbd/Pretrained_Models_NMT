@@ -27,7 +27,6 @@ class Generator(nn.Module):
         
         if log_softmax:
             output = F.log_softmax(logits, dim=-1)
-            output = F.log_softmax(logits, dim=-1)
         else:
             output = logits
         return output

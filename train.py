@@ -224,6 +224,7 @@ def main():
         else:
             print("Warning: contextualized embeddings can be only got from bert or roberta")
             exit(-1)
+    print(model)
 
     """ Building the loss function """
 
@@ -242,7 +243,6 @@ def main():
     print('* number of all parameters that do not need gradient: %d' % n_params_nograd)
 
     assert n_params == (n_params_grad + n_params_nograd)
-    print(model)
 
     if len(opt.gpus) > 1 or opt.virtual_gpu > 1:
         raise NotImplementedError("Warning! Multi-GPU training is not fully tested and potential bugs can happen.")

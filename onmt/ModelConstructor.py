@@ -153,6 +153,7 @@ def build_tm_model(opt, dicts):
                                         is_decoder=False,
                                         gradient_checkpointing=opt.enc_gradient_checkpointing,
                                         )
+
                 elif opt.enc_pretrained_model == "roberta":
                     from pretrain_module.configuration_roberta import RobertaConfig
                     from pretrain_module.modeling_roberta import RobertaModel

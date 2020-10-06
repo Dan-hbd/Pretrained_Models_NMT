@@ -114,6 +114,7 @@ class TransformerEncoder(nn.Module):
                           self.enc_attn_dropout, variational=self.varitional_dropout) for _ in
              range(self.layers)])
 
+
     def forward(self, src, contextul_emb=None, **kwargs):
         """
         Inputs Shapes:
@@ -129,7 +130,8 @@ class TransformerEncoder(nn.Module):
         if self.input_type == "text":
             # by me
             mask_src = src.eq(onmt.Constants.SRC_PAD).unsqueeze(1)  # batch_size  x 1 x len_src for broadcasting
-            if contextul_emb is not None:
+            if  contextul_emb :
+                print("Use context-aware embedding in the model")
                 emb = contextul_emb
             else:
                 emb = embedded_dropout(self.word_lut, src, dropout=self.enc_word_dropout if self.training else 0)
@@ -195,6 +197,7 @@ class TransformerDecoder(nn.Module):
         self.encoder_cnn_downsampling = opt.cnn_downsampling
         self.variational_dropout = opt.variational_dropout
         self.switchout = opt.switchout
+        self.dec_gradient_checkpointing = getattr(opt, "dec_gradient_checkpointing", False) 
 
         if self.switchout > 0:
             self.transformer_word_dropout = 0
@@ -259,6 +262,12 @@ class TransformerDecoder(nn.Module):
             emb = torch.relu(self.feature_projector(emb))
         return emb
 
+    def create_custom_forward(self, module):
+        def custom_forward(*inputs):
+            return module(*inputs)
+
+        return custom_forward
+
     def forward(self, input, context, src, atbs=None, **kwargs):
 
         """
@@ -292,13 +301,14 @@ class TransformerDecoder(nn.Module):
         output = self.preprocess_layer(emb.transpose(0, 1).contiguous())
 
         for i, layer in enumerate(self.layer_modules):
+            if self.dec_gradient_checkpointing and self.training:
+                output, coverage = checkpoint(self.create_custom_forward(layer), output, context, mask_tgt, mask_src)
 
-            if len(self.layer_modules) - i <= onmt.Constants.checkpointing and self.training:
-
-                output, coverage = checkpoint(custom_layer(layer), output, context, mask_tgt, mask_src)
-                # batch_size x len_src x d_model
+            # if len(self.layer_modules) - i <= onmt.Constants.checkpointing and self.training:
+            #     output, coverage = checkpoint(custom_layer(layer), output, context, mask_tgt, mask_src)
 
             else:
+                # coverage 作为attention, 其实返回后并没有在后续用到的样子
                 output, coverage = layer(output, context, mask_tgt, mask_src)  # batch_size x len_src x d_model
 
         # From Google T2T

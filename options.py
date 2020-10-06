@@ -129,7 +129,10 @@ def make_parser(parser):
     parser.add_argument('-enc_pretrain_hidden_size', type=int, default=768,
                         help='Size of bert hidden')
     parser.add_argument('-enc_gradient_checkpointing', action='store_true',
-                        help='use gradient checkpointing to save memory at the expense of slower backward pass')
+                        help='use gradient checkpointing on encdoer')
+    parser.add_argument('-dec_gradient_checkpointing', action='store_true',
+                        help='use gradient checkpointing on decoder')
+
 
     parser.add_argument('-dec_pretrain_word_dropout', type=float, default=0.0,
                         help="""word dropout appled on bert""")
