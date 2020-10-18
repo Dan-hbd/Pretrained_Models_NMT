@@ -63,6 +63,7 @@ class Translator(object):
 
             model_opt.enc_not_load_state = True
             model_opt.dec_not_load_state = True
+            model_opt.encdec_not_load_state = True
             model = build_model(model_opt, checkpoint['dicts'])
             
             # by me

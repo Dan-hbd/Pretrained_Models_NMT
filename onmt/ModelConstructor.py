@@ -167,6 +167,7 @@ def build_tm_model(opt, dicts):
                                            bert_hidden_size=opt.enc_pretrain_hidden_size,
                                            is_decoder=False,
                                            encoder_normalize_before=opt.enc_ln_before,
+                                           gradient_checkpointing=opt.enc_gradient_checkpointing,
                                          )
                     print("enc_ln_beforei:", opt.enc_ln_before)
                 else:

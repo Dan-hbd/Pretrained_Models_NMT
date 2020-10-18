@@ -73,6 +73,7 @@ def main():
     # 下面load_state_dict有依次加载最优的五个模型，所以这里只用构建对象 
     model_opt.enc_not_load_state = True
     model_opt.dec_not_load_state = True
+    model_opt.encdec_not_load_state = True
     dicts = checkpoint['dicts']
 
     main_model = custom_build_model(model_opt, checkpoint['dicts'], lm=opt.lm)
@@ -92,7 +93,8 @@ def main():
 
         model_opt = checkpoint['opt']
         model_opt.enc_not_load_state = True     
-        model_opt.dec_not_load_state = True     
+        model_opt.dec_not_load_state = True
+        model_opt.encdec_not_load_state = True
         # delete optim information to save GPU memory
         if 'optim' in checkpoint:
             del checkpoint['optim']

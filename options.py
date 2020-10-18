@@ -92,6 +92,11 @@ def make_parser(parser):
     parser.add_argument('-dec_pretrained_model', default="transformer", type=str,
                         help=""" the name of trained model""")
 
+    parser.add_argument('-encoder_layerdrop', type=float, default=0.0,
+                        help="""encoder_layerdrop from Fairseq""")
+    parser.add_argument('-decoder_layerdrop', type=float, default=0.0,
+                        help="""decoder_layerdrop from Fairseq""")
+
     parser.add_argument('-enc_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model for src language.""")
     parser.add_argument('-enc_config_name', default="bert_config.json", type=str,
@@ -232,6 +237,12 @@ def make_parser(parser):
                         increase convergence speed.""")
     parser.add_argument('-normalize_gradient', action="store_true",
                         help="""Normalize the gradients by number of tokens before updates""")
+
+    parser.add_argument('-gradient_scaler', type=int, default=3584,
+                        help='avoid gradient overflow with fp16')
+
+
+
     parser.add_argument('-virtual_gpu', type=int, default=1,
                         help='Number of virtual gpus. The trainer will try to mimic asynchronous multi-gpu training')
     # learning rate

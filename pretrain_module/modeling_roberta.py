@@ -168,7 +168,8 @@ class RobertaModel(BertModel):
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
                  is_decoder=False,
-                 encoder_normalize_before=False):
+                 encoder_normalize_before=False,
+                 gradient_checkpointing=False,):
 
         super().__init__(config,bert_word_dropout,
                          bert_emb_dropout,
@@ -176,7 +177,8 @@ class RobertaModel(BertModel):
                          bert_hidden_dropout,
                          bert_hidden_size,
                          is_decoder,
-                         encoder_normalize_before
+                         encoder_normalize_before,
+                         gradient_checkpointing
                          )
 
         # 替换掉原来bert的embedding 为roberta 的 embedding

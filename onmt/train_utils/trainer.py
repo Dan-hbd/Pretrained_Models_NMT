@@ -216,7 +216,9 @@ class XETrainer(BaseTrainer):
         counter = 0
         num_accumulated_words = 0
         num_accumulated_sents = 0
-        denom = 3584
+        #denom = 3584
+        denom = opt.gradient_scaler
+        print("denom:",  denom)
         nan = False
         
         for i in range(iteration, n_samples):
