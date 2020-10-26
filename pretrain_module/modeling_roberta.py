@@ -50,17 +50,30 @@ class RobertaEmbeddings(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.padding_idx = config.pad_token_id
-        print("the padding_idx is:",self.padding_idx)
+        print("the padding_idx is:", self.padding_idx)
         self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=self.padding_idx)
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings, config.hidden_size, padding_idx=self.padding_idx
         )
-        self.max_position_id=config.max_position_embeddings
+        self.max_position_id = config.max_position_embeddings
         self.bert_word_dropout = config.bert_word_dropout
         print("worddropout for roberta:", self.bert_word_dropout)
+        self.emb_dropout = nn.Dropout(config.bert_emb_dropout)
+        print("roberta emb_dropout for roberta:", self.emb_dropout)
+        self.emb_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
-    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
-        position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None, no_emb_offset=False):
+
+        # position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
+        # 中文的预训练模型没有 offset
+        if no_emb_offset:
+            seq_length = input_ids.size(1)
+            position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device)
+            if seq_length > self.max_position_id:
+                position_ids = torch.clamp(position_ids, 0, self.max_position_id - 1)
+            position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+        else:
+            position_ids = create_position_ids_from_input_ids(input_ids, self.padding_idx).to(input_ids.device)
         position_embeddings = self.position_embeddings(position_ids)
 
         if inputs_embeds is None:
@@ -80,8 +93,31 @@ class RobertaEmbeddings(nn.Module):
             embed.norm_type, embed.scale_grad_by_freq, embed.sparse)
 
         embeddings = words_embeddings + position_embeddings
+        embeddings = self.emb_layernorm(embeddings)
+        embeddings = self.emb_dropout(embeddings)
+
         return embeddings
 
+    def emb_step(self, tgt_len, input_ids, token_type_ids=None):
+        position_ids = torch.tensor(tgt_len-1, dtype=torch.long, device=input_ids.device)
+        if tgt_len > self.max_position_id:
+            position_ids = torch.tensor(self.max_position_id-1, dtype=torch.long, device=input_ids.device)
+        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+
+        embed = self.word_embeddings
+        masked_embed_weight = embed.weight
+        padding_idx = embed.padding_idx
+
+        words_embeddings = F.embedding(
+            input_ids, masked_embed_weight, padding_idx, embed.max_norm,
+            embed.norm_type, embed.scale_grad_by_freq, embed.sparse)
+
+        # words_embeddings = self.word_embeddings(input_ids)
+        position_embeddings = self.position_embeddings(position_ids)
+
+        embeddings = words_embeddings + position_embeddings
+        embeddings = self.emb_layernorm(embeddings)
+        return embeddings
 
     def create_position_ids_from_inputs_embeds(self, inputs_embeds):
         """ We are provided embeddings directly. We cannot infer which are padded so just generate
@@ -169,7 +205,8 @@ class RobertaModel(BertModel):
                  bert_hidden_size=None,
                  is_decoder=False,
                  encoder_normalize_before=False,
-                 gradient_checkpointing=False,):
+                 gradient_checkpointing=False,
+                 ):
 
         super().__init__(config,bert_word_dropout,
                          bert_emb_dropout,
@@ -301,6 +338,7 @@ class RobertaLMHead(nn.Module):
 
         # project back to size of vocabulary with bias
         x = self.decoder(x)
+        
 
         return x
 

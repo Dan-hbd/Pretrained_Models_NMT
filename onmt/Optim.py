@@ -71,8 +71,6 @@ class Optim(object):
     
         params_ = filter(lambda p: p.requires_grad, params)
         self.params = list(params_)  # careful: params may be a generator
-        # self.optimizer = Adam(self.params, lr=self.lr, betas=(self.beta1, self.beta2), eps=1e-9,
-                                    #~ weight_decay=self.weight_decay, amsgrad=self.amsgrad)
         if self.method == 'sgd':
             self.optimizer = optim.SGD(self.params, lr=self.lr, weight_decay=self.weight_decay, momentum=0.0)
         elif self.method == 'adam':

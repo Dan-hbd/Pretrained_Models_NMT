@@ -259,12 +259,19 @@ class XETrainer(BaseTrainer):
 
                     loss_dict = self.loss_function(outputs, targets, model=self.model)
                     loss_data = loss_dict['data']
-                    loss = loss_dict['loss'].div(denom)  # a little trick to avoid gradient overflow with fp16
+
+                    # When the batch size is large, each gradient step is very easy to explode on fp16
+                    # Normalizing the loss to grad scaler ensures this will not happen
+                    loss = loss_dict['loss'].div(denom)  
 
                     optimizer = self.optim.optimizer
 
-                    with amp.scale_loss(loss, optimizer) as scaled_loss:
-                        scaled_loss.backward()
+                    #loss.backward()
+                    if self.cuda:
+                        with amp.scale_loss(loss, optimizer) as scaled_loss:
+                            scaled_loss.backward()
+                    else:
+                        loss.backward()
 
                 except RuntimeError as e:
                     if 'out of memory' in str(e):

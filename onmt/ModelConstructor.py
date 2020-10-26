@@ -66,6 +66,7 @@ def build_model(opt, dicts):
         onmt.Constants.SRC_BOS = onmt.Constants.EN_ROBERTA_BOS
         onmt.Constants.SRC_EOS = onmt.Constants.EN_ROBERTA_EOS
 
+
     else:
         print("Warning: wrong enc_pretrained_model")
         exit(-1)
@@ -81,6 +82,26 @@ def build_model(opt, dicts):
         print("Warning: wrong dec_pretrained_model")
         exit(-1)
 
+
+    print("onmt.Constants.SRC_PAD_WORD:", onmt.Constants.SRC_PAD_WORD)
+    print("onmt.Constants.SRC_UNK_WORD:", onmt.Constants.SRC_UNK_WORD)
+    print("onmt.Constants.SRC_BOS_WORD:", onmt.Constants.SRC_BOS_WORD)
+    print("onmt.Constants.SRC_EOS_WORD:", onmt.Constants.SRC_EOS_WORD)
+
+    print("onmt.Constants.SRC_PAD:", onmt.Constants.SRC_PAD)
+    print("onmt.Constants.SRC_UNK:", onmt.Constants.SRC_UNK)
+    print("onmt.Constants.SRC_BOS:", onmt.Constants.SRC_BOS)
+    print("onmt.Constants.SRC_EOS:", onmt.Constants.SRC_EOS)
+
+    print("onmt.Constants.TGT_PAD_WORD:", onmt.Constants.TGT_PAD_WORD)
+    print("onmt.Constants.TGT_UNK_WORD:", onmt.Constants.TGT_UNK_WORD)
+    print("onmt.Constants.TGT_BOS_WORD:", onmt.Constants.TGT_BOS_WORD)
+    print("onmt.Constants.TGT_EOS_WORD:", onmt.Constants.TGT_EOS_WORD)
+
+    print("onmt.Constants.TGT_PAD:", onmt.Constants.TGT_PAD)
+    print("onmt.Constants.TGT_UNK:", onmt.Constants.TGT_UNK)
+    print("onmt.Constants.TGT_BOS:", onmt.Constants.TGT_BOS)
+    print("onmt.Constants.TGT_EOS:", onmt.Constants.TGT_EOS)
 
 
     onmt.Constants.layer_norm = opt.layer_norm
@@ -157,8 +178,8 @@ def build_tm_model(opt, dicts):
                 elif opt.enc_pretrained_model == "roberta":
                     from pretrain_module.configuration_roberta import RobertaConfig
                     from pretrain_module.modeling_roberta import RobertaModel
-
                     enc_roberta_config = RobertaConfig.from_json_file(opt.enc_pretrained_config_dir + "/" + opt.enc_config_name)
+
                     encoder = RobertaModel(enc_roberta_config,
                                            bert_word_dropout=opt.enc_pretrain_word_dropout,
                                            bert_emb_dropout=opt.enc_pretrain_emb_dropout,
@@ -210,6 +231,7 @@ def build_tm_model(opt, dicts):
                                     bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
                                     bert_hidden_size=opt.dec_pretrain_hidden_size,
                                     is_decoder=True,
+                                    gradient_checkpointing=opt.dec_gradient_checkpointing,
                                     )
 
             elif opt.dec_pretrained_model == "roberta":
@@ -219,6 +241,7 @@ def build_tm_model(opt, dicts):
                     from pretrain_module.modeling_roberta import RobertaModel
 
                 dec_roberta_config = RobertaConfig.from_json_file(opt.dec_pretrained_config_dir + "/" + opt.dec_config_name)
+
                 decoder = RobertaModel(dec_roberta_config,
                                        bert_word_dropout=opt.dec_pretrain_word_dropout,
                                        bert_emb_dropout=opt.dec_pretrain_emb_dropout,
@@ -226,6 +249,7 @@ def build_tm_model(opt, dicts):
                                        bert_hidden_dropout=opt.dec_pretrain_hidden_dropout,
                                        bert_hidden_size=opt.dec_pretrain_hidden_size,
                                        is_decoder=True,
+                                       gradient_checkpointing=opt.dec_gradient_checkpointing,
                                        )
             elif opt.dec_pretrained_model == "gpt2":
                 from pretrain_module.configuration_gpt2 import GPT2Config
@@ -266,6 +290,12 @@ def build_tm_model(opt, dicts):
 
         decoder.dec_pretrained_model = opt.dec_pretrained_model
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
+
+
+        if opt.use_normal_ln:
+            print("Fused layer norm is not support, switch back to torch.nn.LayerNorm, result in slower speed")
+            fusedln2ln(model)
+            
 
     else:
         raise NotImplementedError
@@ -355,3 +385,33 @@ def build_fusion(opt, dicts):
     model = FusionNetwork(tm_model, lm_model)
 
     return model
+
+
+def fusedln2ln(model, distributed=False):
+    """
+    if Fused layer norm is not support, switch back to torch.nn.LayerNorm, result in slower speed
+    """
+
+    def replace_layer_norm(m, name):
+        replacable = True
+        try:
+            import apex
+           # import importlib
+           # from apex.normalization.fused_layer_norm import FusedLayerNorm
+           # fused_layer_norm_cuda = importlib.import_module("fused_layer_norm_cuda")
+
+        except ModuleNotFoundError:
+            replacable = False
+
+        if replacable:
+            for attr_str in dir(m):
+                target_attr = getattr(m, attr_str)
+                #if type(target_attr) == torch.nn.LayerNorm:
+                if type(target_attr) == apex.normalization.fused_layer_norm.FusedLayerNorm:
+                    setattr(m, attr_str, nn.LayerNorm(target_attr.normalized_shape,
+                                                        eps=target_attr.eps,
+                                                        elementwise_affine=target_attr.elementwise_affine))
+            for n, ch in m.named_children():
+                replace_layer_norm(ch, n)
+
+    replace_layer_norm(model, "Transformer")

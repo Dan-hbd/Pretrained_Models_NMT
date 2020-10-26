@@ -173,7 +173,7 @@ def main():
                                        batch_size_words=opt.batch_size_words,
                                        data_type=opt.encoder_type,
                                        batch_size_sents=opt.batch_size_sents,
-                                       multiplier = opt.batch_size_multiplier))
+                                       multiplier=opt.batch_size_multiplier))
 
     if opt.load_from:
         checkpoint = torch.load(opt.load_from, map_location=lambda storage, loc: storage)
@@ -229,9 +229,10 @@ def main():
     """ Building the loss function """
 
     loss_function = NMTLossFunc(opt.model_size, dicts['tgt'].size(),
-                            label_smoothing=opt.label_smoothing,
-                            mirror=opt.mirror_loss,
-                            fast_xentropy=opt.fast_xentropy)
+                                label_smoothing=opt.label_smoothing,
+                                mirror=opt.mirror_loss,
+                                fast_xentropy=opt.fast_xentropy
+                                )
 
     n_params = sum([p.nelement() for p in model.parameters()])
     print('* number of all parameters: %d' % n_params)

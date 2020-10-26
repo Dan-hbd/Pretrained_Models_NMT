@@ -73,7 +73,9 @@ class FastTranslator(Translator):
         src = batch.get('source')
         scores = src.new(bsz * beam_size, max_len + 1).float().fill_(0)
         scores_buf = scores.clone()
-        tokens = src.new(bsz * beam_size, max_len + 2).long().fill_(self.src_pad)
+
+        # tokens = src.new(bsz * beam_size, max_len + 2).long().fill_(self.src_pad)
+        tokens = src.new(bsz * beam_size, max_len + 2).long().fill_(self.tgt_pad)
         tokens_buf = tokens.clone()
         tokens[:, 0].fill_(self.bos)  # first token is bos
         attn, attn_buf = None, None
@@ -433,7 +435,7 @@ class FastTranslator(Translator):
         out = self._combine_outputs(outs)
         #attn = self._combine_attention(attns)
         # attn = attn[:, -1, :] # I dont know what this line means
-        attn = None # lol this is never used probably
+        attn = None  # lol this is never used probably
 
         return out, attn
 

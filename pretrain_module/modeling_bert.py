@@ -199,7 +199,7 @@ class BertEmbeddings(nn.Module):
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
 
-    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None, no_emb_offset=False):
         seq_length = input_ids.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device)
         if seq_length > self.max_position_id:
@@ -953,6 +953,7 @@ class BertModel(BertPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        no_offset=False
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -999,7 +1000,11 @@ class BertModel(BertPreTrainedModel):
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
         embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
+            no_emb_offset=no_offset,
         )  # [bsz, src_len, hidden_dim]
         encoder_outputs = self.encoder(
             embedding_output,
@@ -1050,6 +1055,7 @@ class BertModel(BertPreTrainedModel):
         # mask_tgt = mask_tgt[:, -1].unsqueeze(1)
 
         input_shape = input_ids.size()  # [bsz, sent_len]
+        cur_pos = input_shape[-1]
 
         # extended_tgt_mask = get_extended_attention_mask(mask_tgt, data_type, input_shape, is_decoder=True,
         # extended_tgt_mask = self.get_extended_attention_mask(mask_tgt, data_type, input_shape, is_decoder=True,
@@ -1067,8 +1073,8 @@ class BertModel(BertPreTrainedModel):
         # head_mask = get_head_mask(head_mask, self.config.num_hidden_layers, data_type)
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers, data_type)
 
-        if self.dec_pretrained_model == "bert":
-            embedding_output = self.embeddings.emb_step(input_ids.size(1), input_, tgt_token_type)
+        if self.dec_pretrained_model == "bert" or self.dec_pretrained_model == "roberta":
+            embedding_output = self.embeddings.emb_step(cur_pos, input_, tgt_token_type)
         else:
             print("Unknown dec_pretrained_model", self.dec_pretrained_model)
             exit(-1)
@@ -1092,7 +1098,7 @@ class BertModel(BertPreTrainedModel):
             hidden_states = layer_outputs[0]
             decoder_state.update_attention_buffer(buffer, i)
 
-        return hidden_states,buffers[i] 
+        return hidden_states, buffers[i]
 
 
     def renew_buffer(self, new_len):

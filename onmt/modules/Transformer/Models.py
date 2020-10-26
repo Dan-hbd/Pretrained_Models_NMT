@@ -483,7 +483,7 @@ class Transformer(NMTModel):
             # [src_len, batch, d] => [batch, src_len, d]  # to make it consistent with bert
             context = context.transpose(0, 1)
         elif self.encoder.enc_pretrained_model == "bert" or self.encoder.enc_pretrained_model == "roberta":
-            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask) # the encoder is a pretrained model
+            encoder_outputs = self.encoder(src, segments_tensor, src_attention_mask)  # the encoder is a pretrained model
             context = encoder_outputs[0]
         else:
             print("wrong enc_pretrained_model")
@@ -511,7 +511,8 @@ class Transformer(NMTModel):
                                           attention_mask=tgt_attention_mask,
                                           token_type_ids=tgt_token_type,
                                           encoder_hidden_states=context,
-                                          encoder_attention_mask=src_attention_mask)
+                                          encoder_attention_mask=src_attention_mask,
+                                          no_offset=True)
             decoder_output = decoder_output[0]
             decoder_output = decoder_output.transpose(0, 1)  # [bsz, tgt_len, d] => [tgt_len, bsz, d]
             output = decoder_output
@@ -642,7 +643,7 @@ class Transformer(NMTModel):
         if self.decoder.dec_pretrained_model == "bert" or self.decoder.dec_pretrained_model == "roberta":
             hidden = hidden.transpose(0, 1)
         elif self.decoder.dec_pretrained_model == "transformer":
-            hidden=hidden
+            hidden = hidden
         else:
             raise NotImplementedError
         log_prob = self.generator[0](hidden.squeeze(0))
