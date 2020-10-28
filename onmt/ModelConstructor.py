@@ -49,10 +49,12 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'variational_dropout'):
         opt.variational_dropout = False
 
-    if not hasattr(opt, 'enc_ln_before'):
-        opt.enc_ln_before = False
     if not hasattr(opt, 'get_context_emb'):
         opt.get_context_emb = ""
+
+    if not hasattr(opt, 'before_enc_output_ln'):
+        opt.before_enc_output_ln = False
+
 
     # 和数据处理的方式有关，而不是和模型结构有关，除了roberta.en,其他情况用的相同的数据处理方式
     if opt.enc_pretrained_model == 'bert' or opt.enc_pretrained_model == 'transformer':
@@ -172,6 +174,7 @@ def build_tm_model(opt, dicts):
                                         bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
                                         bert_hidden_size=opt.enc_pretrain_hidden_size,
                                         is_decoder=False,
+                                        before_plm_output_ln=opt.before_enc_output_ln,
                                         gradient_checkpointing=opt.enc_gradient_checkpointing,
                                         )
 
@@ -187,10 +190,10 @@ def build_tm_model(opt, dicts):
                                            bert_hidden_dropout=opt.enc_pretrain_hidden_dropout,
                                            bert_hidden_size=opt.enc_pretrain_hidden_size,
                                            is_decoder=False,
-                                           encoder_normalize_before=opt.enc_ln_before,
+                                           before_plm_output_ln=opt.before_enc_output_ln,
                                            gradient_checkpointing=opt.enc_gradient_checkpointing,
                                          )
-                    print("enc_ln_beforei:", opt.enc_ln_before)
+                    print("before_enc_output_ln:", opt.before_enc_output_ln)
                 else:
                     print("Warning: now only bert and roberta pretrained models are implemented:")
                     exit(-1)

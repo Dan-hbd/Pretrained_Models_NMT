@@ -106,10 +106,9 @@ def make_parser(parser):
     parser.add_argument('-enc_not_load_state', action='store_true',
                         help='only create a  Bert Object, not load the state from pytorch modle or fituned model for src')
 
-    parser.add_argument('-enc_ln_before', action='store_true',
-                        help='layernormalization before output for encoder')
-    parser.add_argument('-dec_ln_before', action='store_true',
-                        help='layernormalization before output for decoder')
+    parser.add_argument('-before_enc_output_ln', action='store_true',
+                        help='LayersNnormalization before output for plm as encoder')
+
 
     parser.add_argument('-dec_pretrained_config_dir', default="", type=str,
                         help=""" the path to the pretrained Bert model.""")
@@ -309,7 +308,6 @@ def make_parser(parser):
                         help="Save every this interval.")
 
     # Layer Norm
-
     parser.add_argument('-use_normal_ln', action='store_true',
                         help='if fused LN is not support, swith back to the slower torch.nn,LayerNorm')
 

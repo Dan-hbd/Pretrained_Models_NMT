@@ -192,7 +192,6 @@ class BertEmbeddings(nn.Module):
         self.max_position_id = config.max_position_embeddings
         self.bert_word_dropout = config.bert_word_dropout
         print("config.bert_word_dropout", config.bert_word_dropout)
-
         self.LayerNorm = BertLayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.bert_emb_dropout)
         print("config.bert_emb_dropout", config.bert_emb_dropout)
@@ -255,7 +254,7 @@ class BertEmbeddings(nn.Module):
 
         embeddings = words_embeddings + position_embeddings + token_type_embeddings
         embeddings = self.LayerNorm(embeddings)
-        embeddings = self.dropout(embeddings)
+        #embeddings = self.dropout(embeddings)
         return embeddings
 
 
@@ -889,8 +888,8 @@ class BertModel(BertPreTrainedModel):
                  bert_hidden_dropout=None,
                  bert_hidden_size=None,
                  is_decoder=False,
-                 encoder_normalize_before=False,
-                 gradient_checkpointing=False
+                 before_plm_output_ln=False,
+                 gradient_checkpointing=False,
                  ):
 
         super().__init__(config)
@@ -907,14 +906,17 @@ class BertModel(BertPreTrainedModel):
             self.config.bert_hidden_size = bert_hidden_size
 
         self.config.is_decoder = is_decoder
-        self.config.encoder_normalize_before = encoder_normalize_before
+        self.config.before_plm_output_ln = before_plm_output_ln
         self.config.gradient_checkpointing = gradient_checkpointing
 
-        self.embeddings = BertEmbeddings(config)
-        self.encoder = BertEncoder(config)
-
-        if self.config.encoder_normalize_before:
-            self.emb_layer_norm = BertLayerNorm(self.config.hidden_size, eps=config.layer_norm_eps)
+        self.embeddings = BertEmbeddings(self.config)
+        self.encoder = BertEncoder(self.config)
+        
+        if self.config.before_plm_output_ln:
+            self.before_plm_output_ln = BertLayerNorm(self.config.hidden_size, eps=self.config.layer_norm_eps)
+        else:
+            self.before_plm_output_ln = None
+        
         # self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -1016,8 +1018,8 @@ class BertModel(BertPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        if self.config.encoder_normalize_before:
-            sequence_output = self.emb_layer_norm(encoder_outputs[0])
+        if self.before_plm_output_ln is not None:
+            sequence_output = self.before_plm_output_ln(encoder_outputs[0])
         else:
             sequence_output = encoder_outputs[0]            
             
