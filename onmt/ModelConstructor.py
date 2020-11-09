@@ -55,6 +55,8 @@ def build_model(opt, dicts):
     if not hasattr(opt, 'before_enc_output_ln'):
         opt.before_enc_output_ln = False
 
+    if not hasattr(opt, 'not_use_fused_ln'):
+        opt.not_use_fused_ln = False
 
     # 和数据处理的方式有关，而不是和模型结构有关，除了roberta.en,其他情况用的相同的数据处理方式
     if opt.enc_pretrained_model == 'bert' or opt.enc_pretrained_model == 'transformer':
@@ -295,7 +297,7 @@ def build_tm_model(opt, dicts):
         model = Transformer(encoder, decoder, nn.ModuleList(generators))
 
 
-        if opt.use_normal_ln:
+        if opt.not_use_fused_ln:
             print("Fused layer norm is not support, switch back to torch.nn.LayerNorm, result in slower speed")
             fusedln2ln(model)
             

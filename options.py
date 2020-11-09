@@ -308,7 +308,7 @@ def make_parser(parser):
                         help="Save every this interval.")
 
     # Layer Norm
-    parser.add_argument('-use_normal_ln', action='store_true',
+    parser.add_argument('-not_use_fused_ln', action='store_true',
                         help='if fused LN is not support, swith back to the slower torch.nn,LayerNorm')
 
     # for FUSION
